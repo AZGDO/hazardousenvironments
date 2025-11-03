@@ -15,24 +15,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.abandonsearch.hazardgrid.ui.theme.NightOverlay
-import com.abandonsearch.hazardgrid.ui.theme.TextSecondary
 
 @Composable
 fun LoadingOverlay(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.background(NightOverlay.copy(alpha = 0.9f)),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            CircularProgressIndicator(color = TextSecondary)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 text = "Syncing hazard grid…",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -45,7 +43,7 @@ fun ErrorOverlay(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier.background(NightOverlay.copy(alpha = 0.94f)),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -61,7 +59,7 @@ fun ErrorOverlay(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Button(onClick = onRetry) {

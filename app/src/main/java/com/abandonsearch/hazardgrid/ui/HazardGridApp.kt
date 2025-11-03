@@ -39,6 +39,7 @@ import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,12 +76,6 @@ import com.abandonsearch.hazardgrid.ui.components.WebView
 import com.abandonsearch.hazardgrid.ui.map.HazardMap
 import com.abandonsearch.hazardgrid.ui.map.rememberLocationHeadingState
 import com.abandonsearch.hazardgrid.ui.state.HazardUiState
-import com.abandonsearch.hazardgrid.ui.theme.AccentPrimary
-import com.abandonsearch.hazardgrid.ui.theme.NightBackground
-import com.abandonsearch.hazardgrid.ui.theme.NightOverlay
-import com.abandonsearch.hazardgrid.ui.theme.SurfaceBorder
-import com.abandonsearch.hazardgrid.ui.theme.TextPrimary
-import com.abandonsearch.hazardgrid.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
@@ -131,8 +126,8 @@ fun HazardGridApp() {
         sheetPeekHeight = sheetPeekHeight,
         sheetShape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
         sheetDragHandle = { HazardSheetHandle() },
-        sheetContainerColor = NightOverlay.copy(alpha = 0.97f),
-        sheetContentColor = TextPrimary,
+        sheetContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
+        sheetContentColor = MaterialTheme.colorScheme.onSurface,
         sheetTonalElevation = 14.dp,
         sheetShadowElevation = 32.dp,
         sheetContent = {
@@ -428,8 +423,8 @@ private fun HazardSheetHeader(
     ) {
         Surface(
             shape = RoundedCornerShape(18.dp),
-            color = NightOverlay.copy(alpha = 0.9f),
-            border = BorderStroke(1.dp, SurfaceBorder),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             tonalElevation = 0.dp
         ) {
             Row(
@@ -441,12 +436,12 @@ private fun HazardSheetHeader(
                 Icon(
                     imageVector = Icons.Rounded.WarningAmber,
                     contentDescription = null,
-                    tint = AccentPrimary
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = "Radiation feed",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold
                     )
                     val filteredCount = uiState.searchResults.size
@@ -454,7 +449,7 @@ private fun HazardSheetHeader(
                     val countText = if (total > 0) "$filteredCount / $total" else filteredCount.toString()
                     Text(
                         text = "Signals online: $countText",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -465,7 +460,7 @@ private fun HazardSheetHeader(
             TextButton(onClick = onClearFilters) {
                 Text(
                     text = "Reset filters",
-                    color = AccentPrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -474,7 +469,7 @@ private fun HazardSheetHeader(
             Icon(
                 imageVector = if (isExpanded) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
                 contentDescription = if (isExpanded) "Collapse sheet" else "Expand sheet",
-                tint = AccentPrimary
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -493,7 +488,7 @@ private fun HazardSheetHandle() {
                 .width(72.dp)
                 .height(8.dp)
                 .clip(RoundedCornerShape(32.dp))
-                .background(AccentPrimary.copy(alpha = 0.75f))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.75f))
         )
     }
 }
@@ -523,12 +518,12 @@ private fun LocationOrientationButton(
         else -> "Disable compass mode"
     }
     val iconAlpha = if (!isLocationAvailable && hasLocationPermission && mode != LocationMode.Idle) 0.6f else 1f
-    val iconTint = if (mode == LocationMode.Oriented) AccentPrimary else Color.White
+    val iconTint = if (mode == LocationMode.Oriented) MaterialTheme.colorScheme.primary else Color.White
 
     Surface(
         modifier = modifier.size(52.dp),
         shape = CircleShape,
-        color = NightOverlay.copy(alpha = backgroundAlpha),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = backgroundAlpha),
         shadowElevation = 12.dp,
         tonalElevation = 0.dp,
         onClick = onClick
@@ -562,21 +557,21 @@ private fun HazardPulseIndicator() {
         modifier = Modifier
             .size(28.dp)
             .clip(CircleShape)
-            .background(AccentPrimary.copy(alpha = glowAlpha * 0.35f)),
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = glowAlpha * 0.35f)),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
                 .size(14.dp)
                 .clip(CircleShape)
-                .background(AccentPrimary.copy(alpha = glowAlpha))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = glowAlpha))
         )
     }
 }
 
 @Composable
 private fun HazardBackground() {
-    Box(modifier = Modifier.fillMaxSize().background(NightBackground)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Empty
     }
 }

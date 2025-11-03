@@ -16,23 +16,23 @@ import com.abandonsearch.hazardgrid.domain.GeoPoint
 import com.abandonsearch.hazardgrid.domain.MapViewport
 import com.abandonsearch.hazardgrid.ui.HazardGridViewModel
 import com.abandonsearch.hazardgrid.ui.state.HazardUiState
+import com.yandex.mapkit.Animation
+import com.yandex.mapkit.geometry.Point
+import com.yandex.mapkit.map.CameraListener
+import com.yandex.mapkit.map.CameraPosition
+import com.yandex.mapkit.map.CameraUpdateReason
+import com.yandex.mapkit.map.Cluster
+import com.yandex.mapkit.map.ClusterListener
+import com.yandex.mapkit.map.ClusterTapListener
+import com.yandex.mapkit.map.ClusterizedPlacemarkCollection
+import com.yandex.mapkit.map.IconStyle
+import com.yandex.mapkit.map.MapObject
+import com.yandex.mapkit.map.MapObjectTapListener
+import com.yandex.mapkit.map.PlacemarkMapObject
+import com.yandex.mapkit.mapview.MapView
+import com.yandex.runtime.image.ImageProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
-import world.mappable.mapkit.Animation
-import world.mappable.mapkit.geometry.Point
-import world.mappable.mapkit.map.CameraListener
-import world.mappable.mapkit.map.CameraPosition
-import world.mappable.mapkit.map.CameraUpdateReason
-import world.mappable.mapkit.map.Cluster
-import world.mappable.mapkit.map.ClusterListener
-import world.mappable.mapkit.map.ClusterTapListener
-import world.mappable.mapkit.map.ClusterizedPlacemarkCollection
-import world.mappable.mapkit.map.IconStyle
-import world.mappable.mapkit.map.MapObject
-import world.mappable.mapkit.map.MapObjectTapListener
-import world.mappable.mapkit.map.PlacemarkMapObject
-import world.mappable.mapkit.mapview.MapView
-import com.yandex.runtime.image.ImageProvider
 
 @Composable
 fun HazardMap(
@@ -232,7 +232,7 @@ private class ViewportWatcher(
     }
 
     override fun onCameraPositionChanged(
-        p0: world.mappable.mapkit.map.Map,
+        p0: com.yandex.mapkit.map.Map,
         p1: CameraPosition,
         p2: CameraUpdateReason,
         p3: Boolean

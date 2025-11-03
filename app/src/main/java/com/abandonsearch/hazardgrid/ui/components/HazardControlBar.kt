@@ -33,12 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.abandonsearch.hazardgrid.ui.state.HazardUiState
-import com.abandonsearch.hazardgrid.ui.theme.AccentPrimary
-import com.abandonsearch.hazardgrid.ui.theme.AccentStrong
-import com.abandonsearch.hazardgrid.ui.theme.NightOverlay
-import com.abandonsearch.hazardgrid.ui.theme.SurfaceBorder
-import com.abandonsearch.hazardgrid.ui.theme.TextMuted
-import com.abandonsearch.hazardgrid.ui.theme.TextSecondary
 
 @Composable
 fun HazardControlBar(
@@ -51,10 +45,10 @@ fun HazardControlBar(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(28.dp),
-        color = NightOverlay.copy(alpha = 0.95f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
         tonalElevation = 12.dp,
         shadowElevation = 16.dp,
-        border = BorderStroke(1.dp, SurfaceBorder)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
@@ -67,7 +61,7 @@ fun HazardControlBar(
                 Text(
                     text = "Signal status",
                     style = MaterialTheme.typography.labelMedium,
-                    color = TextMuted
+                    color = MaterialTheme.colorScheme.outline
                 )
                 val filteredCount = uiState.searchResults.size
                 val total = uiState.totalValid
@@ -75,14 +69,14 @@ fun HazardControlBar(
                 Text(
                     text = countText,
                     style = MaterialTheme.typography.titleMedium,
-                    color = AccentPrimary
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
             if (uiState.hasFilters) {
                 TextButton(
                     onClick = onClearFilters,
-                    colors = ButtonDefaults.textButtonColors(contentColor = AccentStrong)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
                     Text(
                         text = "Reset filters",
@@ -93,7 +87,7 @@ fun HazardControlBar(
             }
             TextButton(
                 onClick = onTogglePanel,
-                colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Text(
                     text = if (isPanelOpen) "Hide panel" else "Show panel",
@@ -118,8 +112,8 @@ private fun PulseIndicator() {
         label = "scale"
     )
     val color by transition.animateColor(
-        initialValue = AccentPrimary.copy(alpha = 0.4f),
-        targetValue = AccentPrimary.copy(alpha = 0.9f),
+        initialValue = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+        targetValue = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2000),
             repeatMode = RepeatMode.Reverse
