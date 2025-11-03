@@ -41,7 +41,6 @@ fun PlaceDetailCard(
     modifier: Modifier = Modifier.fillMaxWidth(),
     onClose: () -> Unit,
     onOpenIntel: (String) -> Unit,
-    onSearch: (String) -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -53,20 +52,10 @@ fun PlaceDetailCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier
     ) {
-        var text by remember { mutableStateOf("") }
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            TextField(
-                value = text,
-                onValueChange = {
-                    text = it
-                    onSearch(it)
-                },
-                label = { Text("Search") },
-                modifier = Modifier.fillMaxWidth()
-            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

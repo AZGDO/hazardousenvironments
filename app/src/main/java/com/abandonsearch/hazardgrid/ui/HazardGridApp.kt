@@ -135,8 +135,7 @@ fun HazardGridApp() {
                 PlaceDetailCard(
                     place = uiState.activePlace!!,
                     onClose = { viewModel.setActivePlace(null, centerOnMap = false) },
-                    onOpenIntel = { viewModel.openWebView(it) },
-                    onSearch = viewModel::updateQuery
+                    onOpenIntel = { viewModel.openWebView(it) }
                 )
             } else {
                 HazardPeninsulaSheet(
