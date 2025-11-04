@@ -40,6 +40,29 @@ private val DarkColorScheme = darkColorScheme(
 	surfaceTint = AccentPrimary,
 )
 
+private val LightColorScheme = lightColorScheme(
+	primary = DayAccentPrimary,
+	onPrimary = Color.White,
+	primaryContainer = Color(0xFFFFFBEA),
+	onPrimaryContainer = DayAccentPrimary,
+	secondary = DayAccentStrong,
+	onSecondary = Color.White,
+	secondaryContainer = Color(0xFFFFEBEB),
+	onSecondaryContainer = DayAccentStrong,
+	tertiary = DayAccentPrimary.copy(alpha = 0.7f),
+	onTertiary = Color.Black,
+	background = DayBackground,
+	onBackground = DayTextPrimary,
+	surface = DayOverlay,
+	onSurface = DayTextPrimary,
+	surfaceVariant = DayOverlay,
+	onSurfaceVariant = DayTextSecondary,
+	outline = DaySurfaceBorder,
+	outlineVariant = DaySurfaceBorder.copy(alpha = 0.4f),
+	scrim = Color(0x99000000),
+	surfaceTint = DayAccentPrimary,
+)
+
 @Composable
 fun HazardGridTheme(
     useDarkTheme: Boolean = isSystemInDarkTheme(),
@@ -52,7 +75,7 @@ fun HazardGridTheme(
             if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         useDarkTheme -> DarkColorScheme
-        else -> lightColorScheme()
+        else -> LightColorScheme
     }
     val view = LocalView.current
     if (!view.isInEditMode) {

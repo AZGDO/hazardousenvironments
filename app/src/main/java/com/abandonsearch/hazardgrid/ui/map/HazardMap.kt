@@ -36,7 +36,7 @@ fun HazardMap(
     modifier: Modifier = Modifier,
     uiState: HazardUiState,
     colorScheme: ColorScheme,
-    onMarkerSelected: (Place) -> Unit,
+    onMarkerSelected: (Place?) -> Unit,
     onViewportChanged: (MapViewport) -> Unit,
     mapEvents: Flow<HazardGridViewModel.MapCommand>,
 ) {
@@ -49,8 +49,6 @@ fun HazardMap(
             setMultiTouchControls(true)
             isTilesScaledToDpi = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            setScrollableAreaLimitLatitude(MapView.getTileSystem().getMaxLatitude(), MapView.getTileSystem().getMinLatitude(), 0)
-            setScrollableAreaLimitLongitude(MapView.getTileSystem().getMinLongitude(), MapView.getTileSystem().getMaxLongitude(), 0)
             controller.setZoom(DEFAULT_ZOOM)
             controller.setCenter(OsmGeoPoint(DEFAULT_LAT, DEFAULT_LON))
             minZoomLevel = 4.0
@@ -73,6 +71,14 @@ fun HazardMap(
             locationOverlay.disableMyLocation()
             mapView.onPause()
             mapView.onDetach()
+        }
+    }
+
+    DisposableEffect(onMarkerSelected) {
+        val listener = MapClickListener(onMarkerSelected)
+        mapView.overlays.add(0, listener)
+        onDispose {
+            mapView.overlays.remove(listener)
         }
     }
 
@@ -135,28 +141,38 @@ private class MarkerController(
         mapView: MapView,
         places: List<Place>,
         activeId: Int?,
-        onMarkerSelected: (Place) -> Unit,
+        onMarkerSelected: (Place?) -> Unit,
     ) {
-        clusterer.items.clear()
-        markers.clear()
+        val newPlaceIds = places.map { it.id }.toSet()
+        val oldPlaceIds = markers.keys.toSet()
 
-        for (place in places) {
-            val marker = createMarker(mapView, place).also {
-                markers[place.id] = it
-                clusterer.add(it)
-            }
-            if (place.lat != null && place.lon != null) {
-                marker.position = OsmGeoPoint(place.lat, place.lon)
-            }
-            marker.icon = markerFactory.getDrawable(place.id == activeId)
-            marker.setOnMarkerClickListener { _, _ ->
-                onMarkerSelected(place)
-                true
-            }
-            marker.infoWindow = null
+        val toRemove = oldPlaceIds - newPlaceIds
+        val toAdd = newPlaceIds - oldPlaceIds
+
+        for (id in toRemove) {
+            val marker = markers.remove(id)
+            clusterer.remove(marker)
         }
 
-        markers[activeId]?.icon = markerFactory.getDrawable(true)
+        for (place in places) {
+            if (place.id in toAdd) {
+                val marker = createMarker(mapView, place).also {
+                    markers[place.id] = it
+                    clusterer.add(it)
+                }
+                if (place.lat != null && place.lon != null) {
+                    marker.position = OsmGeoPoint(place.lat, place.lon)
+                }
+                marker.setOnMarkerClickListener { _, _ ->
+                    onMarkerSelected(place)
+                    true
+                }
+            }
+        }
+
+        for ((id, marker) in markers) {
+            marker.icon = markerFactory.getDrawable(id == activeId)
+        }
         clusterer.invalidate()
     }
 
@@ -248,8 +264,29 @@ private const val DEFAULT_ZOOM = 10.0
 private const val FOCUS_ZOOM = 15.0
 private const val ANIMATION_DURATION = 800L
 
+import org.osmdroid.views.overlay.Overlay
+import android.view.MotionEvent
+import org.osmdroid.api.IGeoPoint
+
 private fun normalizeBearing(bearing: Float): Float {
     var value = bearing % 360f
     if (value < 0f) value += 360f
     return value
+}
+
+private class MapClickListener(
+    private val onMapClick: (Place?) -> Unit,
+) : Overlay() {
+    override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
+        val projection = mapView.projection
+        val geoPoint = projection.fromPixels(e.x.toInt(), e.y.toInt())
+        val overlay = mapView.overlays.firstOrNull {
+            it is Marker && it.isInfoWindowShown
+        }
+        if (overlay == null) {
+            onMapClick(null)
+            return true
+        }
+        return false
+    }
 }
