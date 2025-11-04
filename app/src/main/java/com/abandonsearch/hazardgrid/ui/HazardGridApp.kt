@@ -85,7 +85,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -176,7 +175,9 @@ fun HazardGridApp() {
                             sheetState.expand()
                         }
                     }
-                }
+                },
+                onOpenIntel = { webViewUrl = it },
+                onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
             )
         }
     ) { innerPadding ->
@@ -289,9 +290,6 @@ fun HazardGridApp() {
                 }
             }
 
-            val density = LocalDensity.current
-            val pointerHeightPx = with(density) { PINNED_CARD_POINTER_HEIGHT.toPx() }
-
             HazardBackground()
             HazardMap(
                 modifier = Modifier.fillMaxSize(),
@@ -325,6 +323,21 @@ fun HazardGridApp() {
                     onRetry = viewModel::loadPlaces,
                     modifier = Modifier.fillMaxSize()
                 )
+            }
+        }
+        webViewUrl?.let { url ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                WebView(url)
+                IconButton(
+                    onClick = { webViewUrl = null },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Close web view",
+                        tint = TextPrimary
+                    )
+                }
             }
         }
     }
@@ -395,6 +408,8 @@ private fun HazardPeninsulaSheet(
     onClearFilters: () -> Unit,
     onResultSelected: (Int) -> Unit,
     onToggleExpand: () -> Unit,
+    onOpenIntel: (String) -> Unit,
+    onClose: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -410,13 +425,13 @@ private fun HazardPeninsulaSheet(
             onClearFilters = onClearFilters,
             onToggleExpand = onToggleExpand
         )
-        uiState.activePlace?.let { place ->
+        if (uiState.activePlace != null) {
             PlaceDetailCard(
-                place = place,
-                onClose = { viewModel.setActivePlace(null, centerOnMap = false) },
-                onOpenIntel = { webViewUrl = it }
+                place = uiState.activePlace,
+                onClose = onClose,
+                onOpenIntel = onOpenIntel
             )
-        } ?: run {
+        } else {
             FilterPanel(
                 uiState = uiState,
                 isCompact = isCompact,
@@ -430,22 +445,6 @@ private fun HazardPeninsulaSheet(
                 onResultSelected = onResultSelected,
                 modifier = Modifier.fillMaxSize()
             )
-        }
-
-        webViewUrl?.let { url ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                WebView(url)
-                IconButton(
-                    onClick = { webViewUrl = null },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Close web view",
-                        tint = TextPrimary
-                    )
-                }
-            }
         }
     }
 }

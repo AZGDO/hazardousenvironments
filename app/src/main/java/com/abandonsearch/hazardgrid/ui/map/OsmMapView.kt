@@ -16,7 +16,7 @@ fun OsmMapView(
         factory = { context ->
             MapView(context).apply {
                 setTileSource(TileSourceFactory.USGS_SAT)
-                setMultiThreaded(true)
+                setMultiThreadLoadingEnabled(true)
                 isTilesScaledToDpi = true
                 onMapView(this)
             }

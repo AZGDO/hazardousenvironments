@@ -25,10 +25,8 @@ import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint as OsmGeoPoint
-import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
 
 @Composable
 fun HazardMap(
@@ -127,7 +125,7 @@ private class MarkerController(
         activeId: Int?,
         onMarkerSelected: (Place) -> Unit,
     ) {
-        clusterer.items.clear()
+        clusterer.clearItems()
         for (place in places) {
             val marker = markers[place.id] ?: createMarker(mapView, place).also {
                 markers[place.id] = it
@@ -141,10 +139,10 @@ private class MarkerController(
                 true
             }
             marker.infoWindow = null
-            clusterer.add(marker)
+            clusterer.addMarker(marker)
         }
         markers[activeId]?.icon = markerFactory.getDrawable(true)
-        clusterer.invalidate()
+        mapView.invalidate()
     }
 
     fun pulseActiveMarker(activeId: Int?) {
