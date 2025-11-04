@@ -36,6 +36,12 @@ class HazardGridViewModel(
 
     init {
         loadPlaces()
+
+        viewModelScope.launch {
+            uiState.collect {
+                recompute()
+            }
+        }
     }
 
     fun loadPlaces() {
@@ -64,45 +70,37 @@ class HazardGridViewModel(
 
     fun updateViewport(viewport: MapViewport?) {
         _uiState.update { it.copy(viewport = viewport) }
-        recompute()
     }
 
     fun updateQuery(query: String) {
         val sanitized = query.take(MAX_QUERY_LENGTH)
         val newFilter = _uiState.value.filterState.copy(query = sanitized)
         _uiState.update { it.copy(filterState = newFilter) }
-        recompute()
     }
 
     fun updateFloors(filter: FloorsFilter) {
         val newFilter = _uiState.value.filterState.copy(floors = filter)
         _uiState.update { it.copy(filterState = newFilter) }
-        recompute()
     }
 
     fun updateSecurity(filter: ScaleFilter) {
         _uiState.update { it.copy(filterState = it.filterState.copy(security = filter)) }
-        recompute()
     }
 
     fun updateInterior(filter: ScaleFilter) {
         _uiState.update { it.copy(filterState = it.filterState.copy(interior = filter)) }
-        recompute()
     }
 
     fun updateAge(filter: AgeFilter) {
         _uiState.update { it.copy(filterState = it.filterState.copy(age = filter)) }
-        recompute()
     }
 
     fun updateRating(filter: RatingFilter) {
         _uiState.update { it.copy(filterState = it.filterState.copy(rating = filter)) }
-        recompute()
     }
 
     fun updateSort(sort: SortOption) {
         _uiState.update { it.copy(filterState = it.filterState.copy(sort = sort)) }
-        recompute()
     }
 
     fun clearFilters() {
@@ -111,7 +109,6 @@ class HazardGridViewModel(
                 filterState = FilterState(query = current.filterState.query)
             )
         }
-        recompute()
     }
 
     fun setActivePlace(placeId: Int?, centerOnMap: Boolean) {
@@ -144,31 +141,33 @@ class HazardGridViewModel(
     }
 
     private fun recompute() {
-        val snapshot = _uiState.value
-        val filtered = PlaceFilters.applyFilters(snapshot.allPlaces, snapshot.filterState)
-        val sorted = PlaceFilters.sortPlaces(filtered, snapshot.filterState, snapshot.viewport)
-        val searchResults = sorted.take(MAX_RESULTS)
-        val activePlaceId = snapshot.activePlaceId?.takeIf { id ->
-            sorted.any { it.id == id } || snapshot.allPlaces.any { it.id == id }
-        }
-        val activePlace = activePlaceId?.let { id ->
-            sorted.firstOrNull { it.id == id } ?: snapshot.allPlaces.firstOrNull { it.id == id }
-        }
-        val visibleMarkers = PlaceFilters.computeVisibleMarkers(
-            filtered = sorted,
-            viewport = snapshot.viewport,
-            activeId = activePlaceId,
-            maxMarkers = MAX_MARKERS
-        )
-        _uiState.update {
-            it.copy(
-                filteredPlaces = sorted,
-                searchResults = searchResults,
-                visibleMarkers = visibleMarkers,
-                activePlaceId = activePlace?.id,
-                activePlace = activePlace,
-                totalValid = snapshot.allPlaces.size,
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = _uiState.value
+            val filtered = PlaceFilters.applyFilters(snapshot.allPlaces, snapshot.filterState)
+            val sorted = PlaceFilters.sortPlaces(filtered, snapshot.filterState, snapshot.viewport)
+            val searchResults = sorted.take(MAX_RESULTS)
+            val activePlaceId = snapshot.activePlaceId?.takeIf { id ->
+                sorted.any { it.id == id } || snapshot.allPlaces.any { it.id == id }
+            }
+            val activePlace = activePlaceId?.let { id ->
+                sorted.firstOrNull { it.id == id } ?: snapshot.allPlaces.firstOrNull { it.id == id }
+            }
+            val visibleMarkers = PlaceFilters.computeVisibleMarkers(
+                filtered = sorted,
+                viewport = snapshot.viewport,
+                activeId = activePlaceId,
+                maxMarkers = MAX_MARKERS
             )
+            _uiState.update {
+                it.copy(
+                    filteredPlaces = sorted,
+                    searchResults = searchResults,
+                    visibleMarkers = visibleMarkers,
+                    activePlaceId = activePlace?.id,
+                    activePlace = activePlace,
+                    totalValid = snapshot.allPlaces.size,
+                )
+            }
         }
     }
 

@@ -398,10 +398,12 @@ private fun HazardPeninsulaSheet(
     onOpenIntel: (String) -> Unit,
     onClose: () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight()
+            .heightIn(max = screenHeight * 0.25f)
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
