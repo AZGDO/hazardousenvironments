@@ -30,16 +30,30 @@ class CustomRadiusMarkerClusterer(
     }
 
     override fun buildClusterMarker(cluster: StaticCluster, mapView: MapView): Marker {
-        val marker = super.buildClusterMarker(cluster, mapView)
+        val marker = Marker(mapView)
         marker.setOnMarkerClickListener { _, _ ->
             animateCluster(mapView, cluster)
             true
         }
+
+        // Set the custom icon
+        clusterPaint.color = colorScheme.primary.toArgb()
+        textPaint.color = colorScheme.onPrimary.toArgb()
+
+        val size = cluster.size.toString()
+        val radius = 40f
+        val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawCircle(radius, radius, radius, clusterPaint)
+        canvas.drawText(size, radius, radius - (textPaint.descent() + textPaint.ascent()) / 2, textPaint)
+        marker.icon = BitmapDrawable(context.resources, bitmap)
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+
         return marker
     }
 
     private fun animateCluster(mapView: MapView, cluster: StaticCluster) {
-        val markers = cluster.items
+        val markers = cluster.getItems()
         val clusterCenter = cluster.position
 
         for ((i, marker) in markers.withIndex()) {
@@ -58,19 +72,5 @@ class CustomRadiusMarkerClusterer(
             animator.start()
         }
         mapView.controller.animateTo(clusterCenter, mapView.zoomLevelDouble + 1.5, 500L)
-    }
-
-    override fun setClusterIcon(cluster: StaticCluster, marker: Marker) {
-        clusterPaint.color = colorScheme.primary.toArgb()
-        textPaint.color = colorScheme.onPrimary.toArgb()
-
-        val size = cluster.size.toString()
-        val radius = 40f
-        val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawCircle(radius, radius, radius, clusterPaint)
-        canvas.drawText(size, radius, radius - (textPaint.descent() + textPaint.ascent()) / 2, textPaint)
-        marker.icon = BitmapDrawable(context.resources, bitmap)
-        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
     }
 }

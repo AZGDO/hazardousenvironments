@@ -2,12 +2,11 @@ package com.abandonsearch.hazardgrid.ui.map
 
 import android.os.Handler
 import android.os.Looper
-import android.graphics.Point
+import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.doOnDetach
@@ -19,7 +18,6 @@ import com.abandonsearch.hazardgrid.ui.HazardGridViewModel
 import com.abandonsearch.hazardgrid.ui.state.HazardUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
-import java.util.LinkedHashMap
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -27,12 +25,14 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint as OsmGeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import java.util.LinkedHashMap
 
 @Composable
 fun HazardMap(
     modifier: Modifier = Modifier,
     uiState: HazardUiState,
-    colorScheme: androidx.compose.material3.ColorScheme,
+    colorScheme: ColorScheme,
     onMarkerSelected: (Place) -> Unit,
     onViewportChanged: (MapViewport) -> Unit,
     mapEvents: Flow<HazardGridViewModel.MapCommand>,
@@ -40,7 +40,7 @@ fun HazardMap(
     val context = LocalContext.current
     val mapView = remember(context) {
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(TileSourceFactory.USGS_SAT)
             setMultiTouchControls(true)
             isTilesScaledToDpi = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
@@ -126,7 +126,7 @@ private class MarkerController(
         activeId: Int?,
         onMarkerSelected: (Place) -> Unit,
     ) {
-        clusterer.clearItems()
+        clusterer.mItems.clear()
         for (place in places) {
             val marker = markers[place.id] ?: createMarker(mapView, place).also {
                 markers[place.id] = it
@@ -140,22 +140,24 @@ private class MarkerController(
                 true
             }
             marker.infoWindow = null
-            clusterer.addMarker(marker)
+            clusterer.add(marker)
         }
         markers[activeId]?.icon = markerFactory.getDrawable(true)
-        mapView.invalidate()
+        clusterer.invalidate()
     }
 
     fun pulseActiveMarker(activeId: Int?) {
         // Intentionally left for future pulse animation hook
     }
 
-    private fun createMarker(mapView: MapView, place: Place): Marker = Marker(mapView).apply {
-        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        infoWindow = null
+    private fun createMarker(mapView: MapView, place: Place): Marker {
+        val marker = Marker(mapView)
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        marker.infoWindow = null
         if (place.lat != null && place.lon != null) {
-            position = OsmGeoPoint(place.lat, place.lon)
+            marker.position = OsmGeoPoint(place.lat, place.lon)
         }
+        return marker
     }
 }
 
