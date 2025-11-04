@@ -25,11 +25,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,8 +55,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -121,122 +127,173 @@ fun HazardGridApp() {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = false,
+    val sheetState = rememberStandardBottomSheetState(
+        initialValue = SheetValue.PartiallyExpanded,
+        skipHiddenState = true
     )
+    val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
     val coroutineScope = rememberCoroutineScope()
     var webViewUrl by remember { mutableStateOf<String?>(null) }
+    val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val peekHeight = 80.dp + navBarHeight
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val context = LocalContext.current
-            val locationPermissions = remember {
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
+    BottomSheetScaffold(
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = peekHeight,
+        sheetShape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
+        sheetDragHandle = { HazardSheetHandle() },
+        sheetContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+        sheetContentColor = MaterialTheme.colorScheme.onSurface,
+        sheetTonalElevation = 14.dp,
+        sheetContent = {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val isSheetExpanded by remember {
+                    derivedStateOf {
+                        val current = sheetState.currentValue
+                        val target = sheetState.targetValue
+                        current == SheetValue.Expanded || target == SheetValue.Expanded
+                    }
+                }
+                HazardPeninsulaSheet(
+                    uiState = uiState,
+                    isCompact = isCompact,
+                    isExpanded = isSheetExpanded,
+                    onSearchChange = viewModel::updateQuery,
+                    onFloorsChange = viewModel::updateFloors,
+                    onSecurityChange = viewModel::updateSecurity,
+                    onInteriorChange = viewModel::updateInterior,
+                    onAgeChange = viewModel::updateAge,
+                    onRatingChange = viewModel::updateRating,
+                    onSortChange = viewModel::updateSort,
+                    onClearFilters = viewModel::clearFilters,
+                    onResultSelected = { placeId ->
+                        viewModel.setActivePlace(placeId, centerOnMap = true)
+                        coroutineScope.launch { sheetState.partialExpand() }
+                    },
+                    onToggleExpand = {
+                        coroutineScope.launch {
+                            if (isSheetExpanded) {
+                                sheetState.partialExpand()
+                            } else {
+                                sheetState.expand()
+                            }
+                        }
+                    },
+                    onOpenIntel = { webViewUrl = it },
+                    onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
                 )
             }
-            var hasLocationPermission by remember {
-                mutableStateOf(checkLocationPermission(context))
-            }
-            var locationMode by remember { mutableStateOf(LocationMode.Idle) }
-            var lastCenteredLocation by remember { mutableStateOf<GeoPoint?>(null) }
-            var lastOrientationBearing by remember { mutableStateOf<Float?>(null) }
+        }
+    ) { innerPadding ->
+        val context = LocalContext.current
+        val locationPermissions = remember {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
+        }
+        var hasLocationPermission by remember {
+            mutableStateOf(checkLocationPermission(context))
+        }
+        var locationMode by remember { mutableStateOf(LocationMode.Idle) }
+        var lastCenteredLocation by remember { mutableStateOf<GeoPoint?>(null) }
+        var lastOrientationBearing by remember { mutableStateOf<Float?>(null) }
 
-            val permissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestMultiplePermissions()
-            ) { result ->
-                val grantedByLauncher = result.entries.any { it.value }
-                val currentStatus = checkLocationPermission(context)
-                hasLocationPermission = grantedByLauncher || currentStatus
-                if (hasLocationPermission && locationMode == LocationMode.Idle) {
-                    locationMode = LocationMode.Centered
+        val permissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { result ->
+            val grantedByLauncher = result.entries.any { it.value }
+            val currentStatus = checkLocationPermission(context)
+            hasLocationPermission = grantedByLauncher || currentStatus
+            if (hasLocationPermission && locationMode == LocationMode.Idle) {
+                locationMode = LocationMode.Centered
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            hasLocationPermission = checkLocationPermission(context)
+        }
+
+        LaunchedEffect(hasLocationPermission) {
+            if (!hasLocationPermission) {
+                locationMode = LocationMode.Idle
+            }
+        }
+
+        val locationHeadingState = rememberLocationHeadingState(
+            requestUpdates = locationMode != LocationMode.Idle,
+            hasLocationPermission = hasLocationPermission,
+        )
+
+        LaunchedEffect(locationMode) {
+            if (locationMode != LocationMode.Oriented && lastOrientationBearing != null) {
+                viewModel.sendMapCommand(HazardGridViewModel.MapCommand.ResetOrientation)
+                lastOrientationBearing = null
+            }
+            if (locationMode == LocationMode.Idle) {
+                lastCenteredLocation = null
+            }
+        }
+
+        LaunchedEffect(locationHeadingState.location, locationMode, hasLocationPermission) {
+            if (!hasLocationPermission) return@LaunchedEffect
+            val currentLocation = locationHeadingState.location ?: return@LaunchedEffect
+            if (locationMode == LocationMode.Centered || locationMode == LocationMode.Oriented) {
+                val shouldCenter = shouldRecentre(lastCenteredLocation, currentLocation)
+                if (shouldCenter) {
+                    val zoom = if (locationMode == LocationMode.Centered) {
+                        LOCATION_FOCUS_ZOOM
+                    } else {
+                        ORIENTATION_FOCUS_ZOOM
+                    }
+                    viewModel.sendMapCommand(
+                        HazardGridViewModel.MapCommand.FocusOnLocation(
+                            location = currentLocation,
+                            zoom = zoom,
+                            animate = true
+                        )
+                    )
+                    lastCenteredLocation = currentLocation
                 }
             }
+        }
 
-            LaunchedEffect(Unit) {
-                hasLocationPermission = checkLocationPermission(context)
-                sheetState.show()
+        LaunchedEffect(locationHeadingState.heading, locationMode) {
+            if (locationMode == LocationMode.Oriented) {
+                val heading = locationHeadingState.heading ?: return@LaunchedEffect
+                val previous = lastOrientationBearing
+                if (previous == null || bearingDelta(previous, heading) >= ORIENTATION_MIN_DELTA_DEGREES) {
+                    viewModel.sendMapCommand(
+                        HazardGridViewModel.MapCommand.SetOrientation(
+                            bearing = heading
+                        )
+                    )
+                    lastOrientationBearing = heading
+                } else {
+                    lastOrientationBearing = heading
+                }
             }
+        }
 
-            LaunchedEffect(hasLocationPermission) {
-                if (!hasLocationPermission) {
+        val onGpsButtonClick: () -> Unit = {
+            when (locationMode) {
+                LocationMode.Idle -> {
+                    if (hasLocationPermission) {
+                        locationMode = LocationMode.Centered
+                    } else {
+                        permissionLauncher.launch(locationPermissions)
+                    }
+                }
+                LocationMode.Centered -> {
+                    locationMode = LocationMode.Oriented
+                }
+                LocationMode.Oriented -> {
                     locationMode = LocationMode.Idle
                 }
             }
+        }
 
-            val locationHeadingState = rememberLocationHeadingState(
-                requestUpdates = locationMode != LocationMode.Idle,
-                hasLocationPermission = hasLocationPermission,
-            )
-
-            LaunchedEffect(locationMode) {
-                if (locationMode != LocationMode.Oriented && lastOrientationBearing != null) {
-                    viewModel.sendMapCommand(HazardGridViewModel.MapCommand.ResetOrientation)
-                    lastOrientationBearing = null
-                }
-                if (locationMode == LocationMode.Idle) {
-                    lastCenteredLocation = null
-                }
-            }
-
-            LaunchedEffect(locationHeadingState.location, locationMode, hasLocationPermission) {
-                if (!hasLocationPermission) return@LaunchedEffect
-                val currentLocation = locationHeadingState.location ?: return@LaunchedEffect
-                if (locationMode == LocationMode.Centered || locationMode == LocationMode.Oriented) {
-                    val shouldCenter = shouldRecentre(lastCenteredLocation, currentLocation)
-                    if (shouldCenter) {
-                        val zoom = if (locationMode == LocationMode.Centered) {
-                            LOCATION_FOCUS_ZOOM
-                        } else {
-                            ORIENTATION_FOCUS_ZOOM
-                        }
-                        viewModel.sendMapCommand(
-                            HazardGridViewModel.MapCommand.FocusOnLocation(
-                                location = currentLocation,
-                                zoom = zoom,
-                                animate = true
-                            )
-                        )
-                        lastCenteredLocation = currentLocation
-                    }
-                }
-            }
-
-            LaunchedEffect(locationHeadingState.heading, locationMode) {
-                if (locationMode == LocationMode.Oriented) {
-                    val heading = locationHeadingState.heading ?: return@LaunchedEffect
-                    val previous = lastOrientationBearing
-                    if (previous == null || bearingDelta(previous, heading) >= ORIENTATION_MIN_DELTA_DEGREES) {
-                        viewModel.sendMapCommand(
-                            HazardGridViewModel.MapCommand.SetOrientation(
-                                bearing = heading
-                            )
-                        )
-                        lastOrientationBearing = heading
-                    } else {
-                        lastOrientationBearing = heading
-                    }
-                }
-            }
-
-            val onGpsButtonClick: () -> Unit = {
-                when (locationMode) {
-                    LocationMode.Idle -> {
-                        if (hasLocationPermission) {
-                            locationMode = LocationMode.Centered
-                        } else {
-                            permissionLauncher.launch(locationPermissions)
-                        }
-                    }
-                    LocationMode.Centered -> {
-                        locationMode = LocationMode.Oriented
-                    }
-                    LocationMode.Oriented -> {
-                        locationMode = LocationMode.Idle
-                    }
-                }
-            }
-
+        Box(modifier = Modifier.fillMaxSize()) {
             HazardBackground()
             HazardMap(
                 modifier = Modifier.fillMaxSize(),
@@ -244,7 +301,7 @@ fun HazardGridApp() {
                 colorScheme = MaterialTheme.colorScheme,
                 onMarkerSelected = { place ->
                     viewModel.setActivePlace(place.id, centerOnMap = true)
-                    coroutineScope.launch { sheetState.show() }
+                    coroutineScope.launch { sheetState.partialExpand() }
                 },
                 onViewportChanged = viewModel::updateViewport,
                 mapEvents = viewModel.mapEvents
@@ -253,6 +310,7 @@ fun HazardGridApp() {
             LocationOrientationButton(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
+                    .padding(innerPadding)
                     .padding(bottom = 24.dp, end = 16.dp),
                 mode = locationMode,
                 hasLocationPermission = hasLocationPermission,
@@ -272,46 +330,8 @@ fun HazardGridApp() {
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        }
 
-            ModalBottomSheet(
-                onDismissRequest = { coroutineScope.launch { sheetState.hide() } },
-                sheetState = sheetState,
-                shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-                dragHandle = { HazardSheetHandle() },
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = 14.dp,
-                scrimColor = Color.Transparent,
-            ) {
-                HazardPeninsulaSheet(
-                    uiState = uiState,
-                    isCompact = isCompact,
-                    isExpanded = sheetState.isVisible,
-                    onSearchChange = viewModel::updateQuery,
-                    onFloorsChange = viewModel::updateFloors,
-                    onSecurityChange = viewModel::updateSecurity,
-                    onInteriorChange = viewModel::updateInterior,
-                    onAgeChange = viewModel::updateAge,
-                    onRatingChange = viewModel::updateRating,
-                    onSortChange = viewModel::updateSort,
-                    onClearFilters = viewModel::clearFilters,
-                    onResultSelected = { placeId ->
-                        viewModel.setActivePlace(placeId, centerOnMap = true)
-                        coroutineScope.launch { sheetState.hide() }
-                    },
-                    onToggleExpand = {
-                        coroutineScope.launch {
-                            if (sheetState.isVisible) {
-                                sheetState.hide()
-                            } else {
-                                sheetState.expand()
-                            }
-                        }
-                    },
-                    onOpenIntel = { webViewUrl = it },
-                    onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
-                )
-            }
         webViewUrl?.let { url ->
             Box(modifier = Modifier.fillMaxSize()) {
                 WebView(url)
@@ -322,7 +342,7 @@ fun HazardGridApp() {
                     Icon(
                         imageVector = Icons.Rounded.Close,
                         contentDescription = "Close web view",
-                        tint = TextPrimary
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -403,7 +423,6 @@ private fun HazardPeninsulaSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = screenHeight * 0.25f)
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -547,7 +566,7 @@ private fun LocationOrientationButton(
         else -> "Disable compass mode"
     }
     val iconAlpha = if (!isLocationAvailable && hasLocationPermission && mode != LocationMode.Idle) 0.6f else 1f
-    val iconTint = if (mode == LocationMode.Oriented) MaterialTheme.colorScheme.primary else Color.White
+    val iconTint = if (mode == LocationMode.Oriented) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 
     Surface(
         modifier = modifier.size(52.dp),
