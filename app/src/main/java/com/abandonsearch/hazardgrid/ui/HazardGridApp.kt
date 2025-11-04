@@ -295,20 +295,8 @@ fun HazardGridApp() {
 
         Box(modifier = Modifier.fillMaxSize()) {
             HazardBackground()
-            val zoomFactor = 1.75f
-            val density = LocalDensity.current
-            val configuration = LocalConfiguration.current
-            val screenHeight = configuration.screenHeightDp.dp * density.density
-            val screenWidth = configuration.screenWidthDp.dp * density.density
             HazardMap(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = zoomFactor,
-                        scaleY = zoomFactor,
-                        translationX = (screenWidth * (zoomFactor - 1)) / 2,
-                        translationY = (screenHeight * (zoomFactor - 1)) / 2
-                    ),
+                modifier = Modifier.fillMaxSize(),
                 uiState = uiState,
                 colorScheme = MaterialTheme.colorScheme,
                 onMarkerSelected = { place ->
