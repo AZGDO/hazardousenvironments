@@ -49,6 +49,7 @@ fun HazardMap(
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            setBuiltInZoomControls(true)
             isTilesScaledToDpi = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(DEFAULT_ZOOM)
@@ -153,7 +154,7 @@ private class MarkerController(
 
         for (id in toRemove) {
             val marker = markers.remove(id)
-            marker?.let { clusterer.remove(it) }
+            marker?.let { clusterer.items.remove(it) }
         }
 
         for (place in places) {

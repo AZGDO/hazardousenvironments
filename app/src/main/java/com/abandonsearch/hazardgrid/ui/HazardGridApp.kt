@@ -84,6 +84,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -294,8 +295,20 @@ fun HazardGridApp() {
 
         Box(modifier = Modifier.fillMaxSize()) {
             HazardBackground()
+            val zoomFactor = 1.75f
+            val density = LocalDensity.current
+            val configuration = LocalConfiguration.current
+            val screenHeight = configuration.screenHeightDp.dp * density.density
+            val screenWidth = configuration.screenWidthDp.dp * density.density
             HazardMap(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = zoomFactor,
+                        scaleY = zoomFactor,
+                        translationX = (screenWidth * (zoomFactor - 1)) / 2,
+                        translationY = (screenHeight * (zoomFactor - 1)) / 2
+                    ),
                 uiState = uiState,
                 colorScheme = MaterialTheme.colorScheme,
                 onMarkerSelected = { place ->
