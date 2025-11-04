@@ -120,21 +120,25 @@ fun HazardMap(
         }
     }
 
+    LaunchedEffect(uiState.allPlaces, uiState.activePlaceId) {
+        markerController.updateMarkers(
+            mapView = mapView,
+            places = uiState.allPlaces,
+            activeId = uiState.activePlaceId,
+            onMarkerSelected = onMarkerSelected
+        )
+    }
+
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = modifier.pointerInput(Unit) {
-            detectTransformGestures { _, _, _, rotation ->
+            detectTransformGestures { _, pan, _, rotation ->
                 mapView.mapOrientation = mapView.mapOrientation + rotation
+                mapView.scrollBy(pan.x.toInt(), pan.y.toInt())
             }
         },
         factory = { mapView },
         update = { view ->
             viewportWatcher.attach(view)
-            markerController.updateMarkers(
-                mapView = view,
-                places = uiState.allPlaces,
-                activeId = uiState.activePlaceId,
-                onMarkerSelected = onMarkerSelected
-            )
         }
     )
 }
@@ -145,6 +149,7 @@ private class MarkerController(
 ) {
     private val markers = LinkedHashMap<Int, Marker>()
     private val markerFactory = HazardMarkerFactory(context)
+    private var rememberedPlaces: List<Place> = emptyList()
 
     fun updateMarkers(
         mapView: MapView,
@@ -152,33 +157,20 @@ private class MarkerController(
         activeId: Int?,
         onMarkerSelected: (Place?) -> Unit,
     ) {
-        val newPlaceIds = places.map { it.id }.toSet()
-        val oldPlaceIds = markers.keys.toSet()
-
-        val toRemove = oldPlaceIds - newPlaceIds
-        val toAdd = newPlaceIds - oldPlaceIds
-
-        for (id in toRemove) {
-            val marker = markers.remove(id)
-            marker?.let { clusterer.items.remove(it) }
-        }
-
-        for (place in places) {
-            if (place.id in toAdd) {
-                val marker = createMarker(mapView, place).also {
-                    markers[place.id] = it
-                    clusterer.add(it)
-                }
-                if (place.lat != null && place.lon != null) {
-                    marker.position = OsmGeoPoint(place.lat, place.lon)
-                }
+        if (rememberedPlaces !== places) {
+            rememberedPlaces = places
+            clusterer.items.clear()
+            markers.clear()
+            places.forEach { place ->
+                val marker = createMarker(mapView, place)
                 marker.setOnMarkerClickListener { _, _ ->
                     onMarkerSelected(place)
                     true
                 }
+                markers[place.id] = marker
+                clusterer.add(marker)
             }
         }
-
         for ((id, marker) in markers) {
             marker.icon = markerFactory.getDrawable(id == activeId)
         }
