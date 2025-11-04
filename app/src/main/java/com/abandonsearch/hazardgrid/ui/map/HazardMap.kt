@@ -7,8 +7,10 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.doOnDetach
 import com.abandonsearch.hazardgrid.data.Place
@@ -119,7 +121,11 @@ fun HazardMap(
     }
 
     androidx.compose.ui.viewinterop.AndroidView(
-        modifier = modifier,
+        modifier = modifier.pointerInput(Unit) {
+            detectTransformGestures { _, _, _, rotation ->
+                mapView.mapOrientation = mapView.mapOrientation + rotation
+            }
+        },
         factory = { mapView },
         update = { view ->
             viewportWatcher.attach(view)
