@@ -16,6 +16,7 @@ fun OsmMapView(
         factory = { context ->
             MapView(context).apply {
                 setTileSource(TileSourceFactory.USGS_SAT)
+                setMultiTouchControls(true)
                 isTilesScaledToDpi = true
                 onMapView(this)
             }

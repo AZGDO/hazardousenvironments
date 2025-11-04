@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.text.selection.SelectionContainer
 import com.abandonsearch.hazardgrid.R
 import com.abandonsearch.hazardgrid.data.Place
 import com.abandonsearch.hazardgrid.ui.theme.AccentPrimary
@@ -45,11 +46,9 @@ fun PlaceDetailCard(
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-        tonalElevation = 12.dp,
-        shadowElevation = 18.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier
     ) {
         Column(
@@ -58,17 +57,20 @@ fun PlaceDetailCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = place.title.ifBlank { "Unknown site" },
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (place.address.isNotBlank()) {
+                    SelectionContainer {
                         Text(
-                            text = place.address,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = place.title.ifBlank { "Unknown site" },
+                            style = MaterialTheme.typography.titleLarge,
                         )
+                    }
+                    if (place.address.isNotBlank()) {
+                        SelectionContainer {
+                            Text(
+                                text = place.address,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 IconButton(onClose) {
@@ -79,31 +81,37 @@ fun PlaceDetailCard(
                     )
                 }
             }
+
             if (place.description.isNotBlank()) {
-                Text(
-                    text = place.description.trim(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            PlaceMetrics(place)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val coords = formatCoordinates(place)
-                Text(
-                    text = coords ?: "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                TextButton(
-                    onClick = {
-                        coords?.let { clipboard.setText(AnnotatedString(it)) }
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Copy")
+                SelectionContainer {
+                    Text(
+                        text = place.description.trim(),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
+
+            PlaceMetrics(place)
+
+            val coords = formatCoordinates(place)
+            if (coords != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = coords,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(coords))
+                        },
+                    ) {
+                        Text("Copy")
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val mapsUrl = buildMapsUrl(place)
                 if (mapsUrl != null) {
@@ -112,17 +120,13 @@ fun PlaceDetailCard(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl))
                             context.startActivity(intent)
                         },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text("Open maps", fontWeight = FontWeight.SemiBold)
                     }
                 }
                 val url = place.url
                 if (url.isNotBlank()) {
-                    TextButton(
-                        onClick = { onOpenIntel(url) },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                    ) {
+                    TextButton(onClick = { onOpenIntel(url) }) {
                         Text("Open intel")
                     }
                 }

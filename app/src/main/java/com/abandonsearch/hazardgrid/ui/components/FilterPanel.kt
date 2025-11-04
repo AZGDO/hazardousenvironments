@@ -94,18 +94,19 @@ fun FilterPanel(
         }
     }
 
-    LazyColumn(
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-        modifier = modifier.fillMaxSize()
-    ) {
-        item {
-            HazardSearchSection(
-                query = uiState.filterState.query,
-                onSearchChange = onSearchChange
-            )
-        }
-        item {
+    Column(modifier = modifier.fillMaxSize()) {
+        HazardSearchSection(
+            query = uiState.filterState.query,
+            onSearchChange = onSearchChange
+        )
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+            item {
             HazardFilterSection(
                 isCompact = isCompact,
                 onFloorsChange = onFloorsChange,
