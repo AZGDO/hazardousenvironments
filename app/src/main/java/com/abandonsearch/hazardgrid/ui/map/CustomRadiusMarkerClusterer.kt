@@ -24,7 +24,7 @@ class CustomRadiusMarkerClusterer(
         isAntiAlias = true
     }
     private val textPaint = Paint().apply {
-        textSize = 24f
+        textSize = 30f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
     }
@@ -41,8 +41,8 @@ class CustomRadiusMarkerClusterer(
         textPaint.color = colorScheme.onPrimary.toArgb()
 
         val size = cluster.size.toString()
-        val radius = 40f
-        val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
+        val radius = 45f
+        val bitmap = Bitmap.createBitmap(90, 90, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawCircle(radius, radius, radius, clusterPaint)
         canvas.drawText(size, radius, radius - (textPaint.descent() + textPaint.ascent()) / 2, textPaint)
@@ -60,8 +60,8 @@ class CustomRadiusMarkerClusterer(
             val endPoint = marker.position
 
             val animator = ValueAnimator.ofFloat(0f, 1f)
-            animator.duration = 500
-            animator.startDelay = (i * 50).toLong()
+            animator.duration = 400
+            animator.startDelay = (i * 40).toLong() // Stagger the animation
             animator.addUpdateListener { animation ->
                 val fraction = animation.animatedValue as Float
                 val newLat = clusterCenter.latitude + fraction * (endPoint.latitude - clusterCenter.latitude)
@@ -71,6 +71,7 @@ class CustomRadiusMarkerClusterer(
             }
             animator.start()
         }
-        mapView.controller.animateTo(clusterCenter, mapView.zoomLevelDouble + 1.5, 500L)
+        // Animate zoom after the markers have spread out
+        mapView.controller.zoomTo(mapView.zoomLevelDouble + 1.5, 500L)
     }
 }
