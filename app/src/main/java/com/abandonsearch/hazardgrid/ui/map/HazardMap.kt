@@ -32,6 +32,7 @@ import org.osmdroid.views.MapView
 fun HazardMap(
     modifier: Modifier = Modifier,
     uiState: HazardUiState,
+    colorScheme: androidx.compose.material3.ColorScheme,
     onMarkerSelected: (Place) -> Unit,
     onViewportChanged: (MapViewport) -> Unit,
     mapEvents: Flow<HazardGridViewModel.MapCommand>,
@@ -49,7 +50,7 @@ fun HazardMap(
             maxZoomLevel = 19.0
         }
     }
-    val markerClusterer = remember { CustomRadiusMarkerClusterer(context) }
+    val markerClusterer = remember { CustomRadiusMarkerClusterer(context, colorScheme) }
     val markerController = remember { MarkerController(context, markerClusterer) }
     val viewportWatcher = remember { ViewportWatcher(onViewportChanged) }
 

@@ -1,27 +1,29 @@
 package com.abandonsearch.hazardgrid.ui.map
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
-import android.animation.ValueAnimator
 import android.graphics.drawable.BitmapDrawable
+import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.graphics.toArgb
+import org.osmdroid.bonuspack.clustering.RadiusMarkerClusterer
+import org.osmdroid.bonuspack.clustering.StaticCluster
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.clusters.RadiusMarkerClusterer
-import org.osmdroid.views.overlay.clusters.StaticCluster
 
-class CustomRadiusMarkerClusterer(context: Context) : RadiusMarkerClusterer(context) {
+class CustomRadiusMarkerClusterer(
+    private val context: Context,
+    private val colorScheme: ColorScheme
+) : RadiusMarkerClusterer(context) {
 
     private val clusterPaint = Paint().apply {
-        color = Color.parseColor("#FF5722")
         style = Paint.Style.FILL
         isAntiAlias = true
     }
     private val textPaint = Paint().apply {
-        color = Color.WHITE
         textSize = 24f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
@@ -40,31 +42,35 @@ class CustomRadiusMarkerClusterer(context: Context) : RadiusMarkerClusterer(cont
         val markers = cluster.items
         val clusterCenter = cluster.position
 
-        val animator = ValueAnimator.ofFloat(0f, 1f)
-        animator.duration = 500
-        animator.addUpdateListener { animation ->
-            val fraction = animation.animatedValue as Float
-            for (marker in markers) {
-                val startPoint = clusterCenter
-                val endPoint = marker.position
-                val newLat = startPoint.latitude + fraction * (endPoint.latitude - startPoint.latitude)
-                val newLon = startPoint.longitude + fraction * (endPoint.longitude - startPoint.longitude)
+        for ((i, marker) in markers.withIndex()) {
+            val endPoint = marker.position
+
+            val animator = ValueAnimator.ofFloat(0f, 1f)
+            animator.duration = 500
+            animator.startDelay = (i * 50).toLong()
+            animator.addUpdateListener { animation ->
+                val fraction = animation.animatedValue as Float
+                val newLat = clusterCenter.latitude + fraction * (endPoint.latitude - clusterCenter.latitude)
+                val newLon = clusterCenter.longitude + fraction * (endPoint.longitude - clusterCenter.longitude)
                 marker.position = GeoPoint(newLat, newLon)
+                mapView.invalidate()
             }
-            mapView.invalidate()
+            animator.start()
         }
-        animator.start()
-        mapView.controller.animateTo(clusterCenter, mapView.zoomLevelDouble + 2, 500L)
+        mapView.controller.animateTo(clusterCenter, mapView.zoomLevelDouble + 1.5, 500L)
     }
 
     override fun setClusterIcon(cluster: StaticCluster, marker: Marker) {
+        clusterPaint.color = colorScheme.primary.toArgb()
+        textPaint.color = colorScheme.onPrimary.toArgb()
+
         val size = cluster.size.toString()
         val radius = 40f
         val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawCircle(radius, radius, radius, clusterPaint)
         canvas.drawText(size, radius, radius - (textPaint.descent() + textPaint.ascent()) / 2, textPaint)
-        marker.icon = BitmapDrawable(mContext.resources, bitmap)
+        marker.icon = BitmapDrawable(context.resources, bitmap)
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
     }
 }

@@ -294,6 +294,7 @@ fun HazardGridApp() {
             HazardMap(
                 modifier = Modifier.fillMaxSize(),
                 uiState = uiState,
+                colorScheme = MaterialTheme.colorScheme,
                 onMarkerSelected = { place ->
                     viewModel.setActivePlace(place.id, centerOnMap = true)
                     coroutineScope.launch { sheetState.expand() }
