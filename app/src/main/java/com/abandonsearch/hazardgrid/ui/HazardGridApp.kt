@@ -44,7 +44,6 @@ import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.WarningAmber
-import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,8 +51,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -122,66 +123,14 @@ fun HazardGridApp() {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900
-    val sheetPeekHeight = if (isCompact) 168.dp else 240.dp
-
-    val sheetState = rememberStandardBottomSheetState(
-        initialValue = if (isCompact) SheetValue.PartiallyExpanded else SheetValue.Expanded,
-        skipHiddenState = true
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = false,
     )
-    val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
     val coroutineScope = rememberCoroutineScope()
     var webViewUrl by remember { mutableStateOf<String?>(null) }
+    var showBottomSheet by remember { mutableStateOf(false) }
 
-    val isSheetExpanded by remember {
-        derivedStateOf {
-            val current = sheetState.currentValue
-            val target = sheetState.targetValue
-            current == SheetValue.Expanded || target == SheetValue.Expanded
-        }
-    }
-
-
-    BottomSheetScaffold(
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = sheetPeekHeight,
-        sheetShape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-        sheetDragHandle = { HazardSheetHandle() },
-        sheetContainerColor = NightOverlay.copy(alpha = 0.97f),
-        sheetContentColor = TextPrimary,
-        sheetTonalElevation = 14.dp,
-        sheetShadowElevation = 32.dp,
-        sheetContent = {
-            HazardPeninsulaSheet(
-                uiState = uiState,
-                isCompact = isCompact,
-                isExpanded = isSheetExpanded,
-                onSearchChange = viewModel::updateQuery,
-                onFloorsChange = viewModel::updateFloors,
-                onSecurityChange = viewModel::updateSecurity,
-                onInteriorChange = viewModel::updateInterior,
-                onAgeChange = viewModel::updateAge,
-                onRatingChange = viewModel::updateRating,
-                onSortChange = viewModel::updateSort,
-                onClearFilters = viewModel::clearFilters,
-                onResultSelected = { placeId ->
-                    viewModel.setActivePlace(placeId, centerOnMap = true)
-                    coroutineScope.launch { sheetState.partialExpand() }
-                },
-                onToggleExpand = {
-                    coroutineScope.launch {
-                        if (isSheetExpanded) {
-                            sheetState.partialExpand()
-                        } else {
-                            sheetState.expand()
-                        }
-                    }
-                },
-                onOpenIntel = { webViewUrl = it },
-                onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
-            )
-        }
-    ) { innerPadding ->
-        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val context = LocalContext.current
             val locationPermissions = remember {
                 arrayOf(
@@ -297,7 +246,7 @@ fun HazardGridApp() {
                 colorScheme = MaterialTheme.colorScheme,
                 onMarkerSelected = { place ->
                     viewModel.setActivePlace(place.id, centerOnMap = true)
-                    coroutineScope.launch { sheetState.expand() }
+                    showBottomSheet = true
                 },
                 onViewportChanged = viewModel::updateViewport,
                 mapEvents = viewModel.mapEvents
@@ -324,6 +273,48 @@ fun HazardGridApp() {
                     onRetry = viewModel::loadPlaces,
                     modifier = Modifier.fillMaxSize()
                 )
+            }
+
+            if (showBottomSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showBottomSheet = false },
+                    sheetState = sheetState,
+                    shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
+                    dragHandle = { HazardSheetHandle() },
+                    containerColor = NightOverlay.copy(alpha = 0.97f),
+                    contentColor = TextPrimary,
+                    tonalElevation = 14.dp,
+                    shadowElevation = 32.dp,
+                ) {
+                    HazardPeninsulaSheet(
+                        uiState = uiState,
+                        isCompact = isCompact,
+                        isExpanded = sheetState.isVisible,
+                        onSearchChange = viewModel::updateQuery,
+                        onFloorsChange = viewModel::updateFloors,
+                        onSecurityChange = viewModel::updateSecurity,
+                        onInteriorChange = viewModel::updateInterior,
+                        onAgeChange = viewModel::updateAge,
+                        onRatingChange = viewModel::updateRating,
+                        onSortChange = viewModel::updateSort,
+                        onClearFilters = viewModel::clearFilters,
+                        onResultSelected = { placeId ->
+                            viewModel.setActivePlace(placeId, centerOnMap = true)
+                            coroutineScope.launch { sheetState.hide() }
+                        },
+                        onToggleExpand = {
+                            coroutineScope.launch {
+                                if (sheetState.isVisible) {
+                                    sheetState.hide()
+                                } else {
+                                    sheetState.expand()
+                                }
+                            }
+                        },
+                        onOpenIntel = { webViewUrl = it },
+                        onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
+                    )
+                }
             }
         }
         webViewUrl?.let { url ->
