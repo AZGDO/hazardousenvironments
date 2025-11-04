@@ -40,12 +40,19 @@ private val HazardDarkColorScheme = darkColorScheme(
 @Composable
 fun HazardGridTheme(
     useDarkTheme: Boolean = isSystemInDarkTheme(),
+    useDynamicColors: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        dynamicDarkColorScheme(LocalContext.current)
-    } else {
-        HazardDarkColorScheme
+    val colorScheme = when {
+        useDynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (useDarkTheme) {
+                dynamicDarkColorScheme(LocalContext.current)
+            } else {
+                dynamicLightColorScheme(LocalContext.current)
+            }
+        }
+        useDarkTheme -> HazardDarkColorScheme
+        else -> HazardDarkColorScheme // We only have a dark theme for now
     }
     val view = LocalView.current
     if (!view.isInEditMode) {

@@ -49,7 +49,7 @@ fun HazardMap(
             maxZoomLevel = 19.0
         }
     }
-    val markerClusterer = remember { AnimatedRadiusMarkerClusterer(context) }
+    val markerClusterer = remember { CustomRadiusMarkerClusterer(context) }
     val markerController = remember { MarkerController(context, markerClusterer) }
     val viewportWatcher = remember { ViewportWatcher(onViewportChanged) }
 
@@ -114,7 +114,7 @@ fun HazardMap(
 
 private class MarkerController(
     context: android.content.Context,
-    private val clusterer: AnimatedRadiusMarkerClusterer,
+    private val clusterer: CustomRadiusMarkerClusterer,
 ) {
     private val markers = LinkedHashMap<Int, Marker>()
     private val markerFactory = HazardMarkerFactory(context)
