@@ -18,6 +18,7 @@ import com.abandonsearch.hazardgrid.ui.HazardGridViewModel
 import com.abandonsearch.hazardgrid.ui.state.HazardUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
+import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -41,6 +42,8 @@ fun HazardMap(
 ) {
     val context = LocalContext.current
     val mapView = remember(context) {
+        Configuration.getInstance().userAgentValue = context.packageName
+        Configuration.getInstance().tileDownloadThreads = 12
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
