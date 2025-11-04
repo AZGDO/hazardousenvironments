@@ -49,7 +49,6 @@ fun HazardMap(
             setMultiTouchControls(true)
             isTilesScaledToDpi = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            setMapOrientation(0f, true)
             setScrollableAreaLimitLatitude(MapView.getTileSystem().getMaxLatitude(), MapView.getTileSystem().getMinLatitude(), 0)
             setScrollableAreaLimitLongitude(MapView.getTileSystem().getMinLongitude(), MapView.getTileSystem().getMaxLongitude(), 0)
             controller.setZoom(DEFAULT_ZOOM)
@@ -158,7 +157,7 @@ private class MarkerController(
 
         for (placeId in existingPlaceIds) {
             markers.remove(placeId)?.let {
-                clusterer.items.remove(it)
+                clusterer.remove(it)
             }
         }
 

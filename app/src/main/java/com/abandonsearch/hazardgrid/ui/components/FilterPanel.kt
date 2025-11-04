@@ -160,29 +160,29 @@ private fun HazardSearchSection(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = "Search the grid",
-            color = AccentPrimary,
+            color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold
         )
         OutlinedTextField(
             value = query,
             onValueChange = onSearchChange,
-            placeholder = { Text("Search by title, intel, address", color = TextMuted) },
+            placeholder = { Text("Search by title, intel, address", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
                 imeAction = ImeAction.Search
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = SurfaceBorder,
-                focusedBorderColor = AccentPrimary,
-                focusedLabelColor = AccentPrimary,
-                cursorColor = AccentPrimary,
-                focusedContainerColor = NightOverlay.copy(alpha = 0.9f),
-                unfocusedContainerColor = NightOverlay.copy(alpha = 0.85f),
-                disabledContainerColor = NightOverlay.copy(alpha = 0.8f)
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
             ),
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
             modifier = Modifier.fillMaxWidth()
         )
         HazardDivider()
@@ -425,9 +425,9 @@ private fun ResultCard(
         shadowElevation = if (isActive) 24.dp else 10.dp,
         border = BorderStroke(
             1.dp,
-            if (isActive) AccentStrong.copy(alpha = 0.5f) else SurfaceBorder
+            if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
         ),
-        color = NightOverlay.copy(alpha = if (isActive) 0.98f else 0.94f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isActive) 0.98f else 0.94f),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -441,7 +441,7 @@ private fun ResultCard(
                 Text(
                     text = place.title.ifBlank { "Unknown site" },
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -449,7 +449,7 @@ private fun ResultCard(
                     Text(
                         text = place.address,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -459,7 +459,7 @@ private fun ResultCard(
                 Text(
                     text = place.description.trim(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -487,7 +487,7 @@ private fun ResultCard(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl))
                             context.startActivity(intent)
                         },
-                        colors = ButtonDefaults.textButtonColors(contentColor = AccentPrimary)
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text("Open maps", fontWeight = FontWeight.SemiBold)
                     }
@@ -498,7 +498,7 @@ private fun ResultCard(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(place.url))
                             context.startActivity(intent)
                         },
-                        colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                     ) {
                         Text("Open intel")
                     }

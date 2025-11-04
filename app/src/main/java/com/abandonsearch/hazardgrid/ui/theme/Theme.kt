@@ -15,27 +15,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val HazardDarkColorScheme = darkColorScheme(
-    primary = AccentPrimary,
-    onPrimary = Color.Black,
-    primaryContainer = Color(0xFF1C1C1C),
-    onPrimaryContainer = AccentPrimary,
-    secondary = AccentStrong,
-    onSecondary = Color.Black,
-    secondaryContainer = Color(0xFF3A1515),
-    onSecondaryContainer = AccentStrong,
-    tertiary = AccentPrimary.copy(alpha = 0.7f),
-    onTertiary = Color.Black,
-    background = NightBackground,
-    onBackground = TextPrimary,
-    surface = NightOverlay,
-    onSurface = TextPrimary,
-    surfaceVariant = NightOverlay,
-    onSurfaceVariant = TextSecondary,
-    outline = SurfaceBorder,
-    outlineVariant = SurfaceBorder.copy(alpha = 0.4f),
-    scrim = Color(0xCC000000),
-    surfaceTint = AccentPrimary,
+import androidx.compose.material3.lightColorScheme
+
+private val DarkColorScheme = darkColorScheme(
+	primary = AccentPrimary,
+	onPrimary = Color.Black,
+	primaryContainer = Color(0xFF1C1C1C),
+	onPrimaryContainer = AccentPrimary,
+	secondary = AccentStrong,
+	onSecondary = Color.Black,
+	secondaryContainer = Color(0xFF3A1515),
+	onSecondaryContainer = AccentStrong,
+	tertiary = AccentPrimary.copy(alpha = 0.7f),
+	onTertiary = Color.Black,
+	background = NightBackground,
+	onBackground = TextPrimary,
+	surface = NightOverlay,
+	onSurface = TextPrimary,
+	surfaceVariant = NightOverlay,
+	onSurfaceVariant = TextSecondary,
+	outline = SurfaceBorder,
+	outlineVariant = SurfaceBorder.copy(alpha = 0.4f),
+	scrim = Color(0xCC000000),
+	surfaceTint = AccentPrimary,
 )
 
 @Composable
@@ -46,14 +48,11 @@ fun HazardGridTheme(
 ) {
     val colorScheme = when {
         useDynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (useDarkTheme) {
-                dynamicDarkColorScheme(LocalContext.current)
-            } else {
-                dynamicLightColorScheme(LocalContext.current)
-            }
+            val context = LocalContext.current
+            if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        useDarkTheme -> HazardDarkColorScheme
-        else -> HazardDarkColorScheme // We only have a dark theme for now
+        useDarkTheme -> DarkColorScheme
+        else -> lightColorScheme()
     }
     val view = LocalView.current
     if (!view.isInEditMode) {

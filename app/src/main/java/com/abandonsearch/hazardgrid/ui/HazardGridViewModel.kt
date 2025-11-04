@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 class HazardGridViewModel(
     private val repository: PlacesRepository
@@ -56,7 +57,6 @@ class HazardGridViewModel(
                         totalValid = places.size,
                     )
                 }
-                recompute()
             } catch (throwable: Throwable) {
                 _uiState.update {
                     it.copy(
@@ -114,7 +114,6 @@ class HazardGridViewModel(
     fun setActivePlace(placeId: Int?, centerOnMap: Boolean) {
         val place = placeId?.let { id -> findPlaceById(id) }
         _uiState.update { it.copy(activePlaceId = place?.id, activePlace = place) }
-        recompute()
         if (centerOnMap && place != null) {
             _mapEvents.tryEmit(MapCommand.FocusOnPlace(place))
         }
