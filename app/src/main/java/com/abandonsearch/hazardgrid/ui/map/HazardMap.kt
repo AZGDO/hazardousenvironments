@@ -72,7 +72,7 @@ fun HazardMap(
     }
     val viewportWatcher = remember { ViewportWatcher(onViewportChanged) }
     val locationOverlay = remember { MyLocationNewOverlay(GpsMyLocationProvider(context), mapView) }
-    val markerOverlay = remember { CustomMarkerOverlay(onMarkerSelected) }
+    val markerOverlay = remember { CustomMarkerOverlay(context, onMarkerSelected) }
 
     DisposableEffect(mapView) {
         mapView.onResume()

@@ -4,32 +4,37 @@ import android.graphics.Canvas
 import android.graphics.Point
 import android.graphics.Rect
 import android.view.MotionEvent
+import android.content.Context
 import com.abandonsearch.hazardgrid.data.Place
-import com.abandonsearch.hazardgrid.domain.GeoPoint
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.views.MapView
+import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 
 class CustomMarkerOverlay(
+    context: Context,
     private val onMarkerSelected: (Place?) -> Unit,
 ) : Overlay() {
 
     private val markers = mutableListOf<Marker>()
     private val visibleMarkers = mutableListOf<Marker>()
     private var activeMarker: Marker? = null
-    private val markerFactory = HazardMarkerFactory()
+    private val markerFactory = HazardMarkerFactory(context)
     private val markerRect = Rect()
     private val viewRect = Rect()
     private val touchPoint = Point()
 
     fun setPlaces(places: List<Place>, activePlaceId: Int?) {
+        activeMarker = null
         markers.clear()
         places.forEach { place ->
+            val lat = place.lat ?: return@forEach
+            val lon = place.lon ?: return@forEach
             val marker = Marker(
                 id = place.id,
                 place = place,
-                point = GeoPoint(place.latitude, place.longitude)
+                point = GeoPoint(lat, lon)
             )
             markers.add(marker)
             if (place.id == activePlaceId) {
@@ -40,11 +45,14 @@ class CustomMarkerOverlay(
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
+
         val projection = mapView.projection
         val viewBounds = mapView.boundingBox
         visibleMarkers.clear()
-        markers.forEach { marker ->
-            if (viewBounds.contains(marker.point.latitude, marker.point.longitude)) {
+
+        for (i in markers.indices.reversed()) {
+            val marker = markers[i]
+            if (viewBounds.contains(marker.point)) {
                 visibleMarkers.add(marker)
                 drawMarker(canvas, projection, marker)
             }
@@ -52,10 +60,11 @@ class CustomMarkerOverlay(
     }
 
     private fun drawMarker(canvas: Canvas, projection: Projection, marker: Marker) {
-        val screenPoint = projection.toPixels(marker.point.latitude, marker.point.longitude, null)
-        val drawable = markerFactory.create(marker.place, isSelected = marker.id == activeMarker?.id)
+        val screenPoint = projection.toPixels(marker.point, null)
+        val drawable = markerFactory.getDrawable(isSelected = marker.id == activeMarker?.id)
         val halfWidth = drawable.intrinsicWidth / 2
         val halfHeight = drawable.intrinsicHeight / 2
+
         markerRect.set(
             screenPoint.x - halfWidth,
             screenPoint.y - halfHeight,
@@ -68,13 +77,8 @@ class CustomMarkerOverlay(
 
     override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
         val tappedMarker = getTappedMarker(e, mapView)
-        if (tappedMarker != null) {
-            activeMarker = tappedMarker
-            onMarkerSelected(tappedMarker.place)
-        } else {
-            activeMarker = null
-            onMarkerSelected(null)
-        }
+        activeMarker = tappedMarker
+        onMarkerSelected(tappedMarker?.place)
         mapView.invalidate()
         return tappedMarker != null
     }
@@ -86,8 +90,8 @@ class CustomMarkerOverlay(
 
         for (i in visibleMarkers.indices.reversed()) {
             val marker = visibleMarkers[i]
-            val screenPoint = projection.toPixels(marker.point.latitude, marker.point.longitude, null)
-            val drawable = markerFactory.create(marker.place, isSelected = false)
+            val screenPoint = projection.toPixels(marker.point, null)
+            val drawable = markerFactory.getDrawable(isSelected = false)
             val halfWidth = drawable.intrinsicWidth / 2
             val halfHeight = drawable.intrinsicHeight / 2
 
@@ -97,6 +101,7 @@ class CustomMarkerOverlay(
                 screenPoint.x + halfWidth,
                 screenPoint.y + halfHeight
             )
+
             if (markerRect.contains(touchPoint.x, touchPoint.y)) {
                 return marker
             }
