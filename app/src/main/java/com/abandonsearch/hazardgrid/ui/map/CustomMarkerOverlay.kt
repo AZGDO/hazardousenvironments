@@ -9,12 +9,13 @@ import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.animation.BounceInterpolator
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.shapes.MaterialShapes
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.ui.graphics.toArgb
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
@@ -35,6 +36,7 @@ class CustomMarkerOverlay(
     private val markers = mutableListOf<Marker>()
     private val handler = Handler(Looper.getMainLooper())
     private var activeMarker: Marker? = null
+    private val interpolator = BounceInterpolator()
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -58,23 +60,13 @@ class CustomMarkerOverlay(
         MaterialShapes.Pentagon,
         MaterialShapes.Cookie6Sided,
         MaterialShapes.Arch,
-        MaterialShapes.Arrow,
         MaterialShapes.Gem,
         MaterialShapes.Cookie7Sided,
-        MaterialShapes.Fan,
         MaterialShapes.VerySunny,
-        MaterialShapes.Cookie9Sided,
-        MaterialShapes.Boom,
+        MaterialShapes.Arrow,
         MaterialShapes.Ghostish,
-        MaterialShapes.SoftBoom,
-        MaterialShapes.PixelCircle,
         MaterialShapes.Flower,
-        MaterialShapes.PixelTriangle,
-        MaterialShapes.Puffy,
-        MaterialShapes.Bun,
-        MaterialShapes.PuffyDiamond,
-        MaterialShapes.Heart,
-        MaterialShapes.Cookie12Sided
+        MaterialShapes.Bun
     )
     private val accentColors = listOf(
         colorScheme.primary,
@@ -110,16 +102,16 @@ class CustomMarkerOverlay(
             if (viewBounds.contains(marker.point)) {
                 val screenPoint = projection.toPixels(marker.point, null)
                 val polygon = if (marker.isAnimating) {
-                    val progress = (System.currentTimeMillis() - marker.animationStartTime) / ANIMATION_DURATION.toFloat()
+                    var progress = (System.currentTimeMillis() - marker.animationStartTime) / ANIMATION_DURATION.toFloat()
                     if (progress >= 1f) {
                         marker.isAnimating = false
                         marker.startPolygon = marker.endPolygon
-                        marker.startPolygon
-                    } else {
-                        val morph = Morph(marker.startPolygon, marker.endPolygon)
-                        morph.toPath(progress, path)
-                        null
+                        progress = 1f
                     }
+                    val interpolatedProgress = interpolator.getInterpolation(progress)
+                    val morph = Morph(marker.startPolygon, marker.endPolygon)
+                    morph.toPath(interpolatedProgress, path)
+                    null
                 } else {
                     marker.startPolygon
                 }
@@ -136,9 +128,12 @@ class CustomMarkerOverlay(
                 }
                 path.offset(screenPoint.x.toFloat(), screenPoint.y.toFloat())
 
+                canvas.save()
+                canvas.rotate(marker.rotation, screenPoint.x.toFloat(), screenPoint.y.toFloat())
                 fillPaint.color = marker.color
                 canvas.drawPath(path, fillPaint)
                 canvas.drawPath(path, strokePaint)
+                canvas.restore()
             }
         }
     }
@@ -147,11 +142,8 @@ class CustomMarkerOverlay(
         val tappedMarker = getTappedMarker(e, mapView)
 
         if (tappedMarker != null) {
-            if (activeMarker != tappedMarker) {
-                activeMarker?.let { animateShapeChange(it) }
-                animateShapeChange(tappedMarker)
-                activeMarker = tappedMarker
-            }
+            animateShapeChange(tappedMarker)
+            activeMarker = tappedMarker
             onMarkerSelected(tappedMarker.place)
         } else {
             activeMarker?.let { animateShapeChange(it) }
@@ -165,7 +157,21 @@ class CustomMarkerOverlay(
     private fun animateShapeChange(marker: Marker) {
         marker.isAnimating = true
         marker.animationStartTime = System.currentTimeMillis()
-        marker.endPolygon = shapes.random()
+
+        var nextShape = shapes.random()
+        while (nextShape == marker.startPolygon) {
+            nextShape = shapes.random()
+        }
+        marker.endPolygon = nextShape
+
+        var nextColor = accentColors.random().toArgb()
+        while (nextColor == marker.color) {
+            nextColor = accentColors.random().toArgb()
+        }
+        marker.color = nextColor
+
+        marker.rotation = (0..360).random().toFloat()
+
         handler.post(object : Runnable {
             override fun run() {
                 if (marker.isAnimating) {
@@ -197,6 +203,7 @@ class CustomMarkerOverlay(
         var startPolygon: RoundedPolygon,
         var endPolygon: RoundedPolygon,
         var color: Int,
+        var rotation: Float = (0..360).random().toFloat(),
         var isAnimating: Boolean = false,
         var animationStartTime: Long = 0L,
         val animationSpec: AnimationSpec<Float> = spring(
