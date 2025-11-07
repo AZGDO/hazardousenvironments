@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.doOnDetach
+import androidx.compose.ui.viewinterop.AndroidView
 import com.abandonsearch.hazardgrid.data.Place
 import com.abandonsearch.hazardgrid.domain.GeoBounds
 import com.abandonsearch.hazardgrid.domain.GeoPoint
