@@ -128,7 +128,7 @@ fun HazardGridApp() {
     val isCompact = configuration.screenWidthDp < 900
     val sheetState = rememberStandardBottomSheetState(
         initialValue = SheetValue.PartiallyExpanded,
-        skipHiddenState = false
+        skipHiddenState = true
     )
     val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
     val coroutineScope = rememberCoroutineScope()
@@ -141,8 +141,8 @@ fun HazardGridApp() {
         coroutineScope.launch {
             if (isMapDragging) {
                 sheetState.hide()
-            } else {
-                sheetState.partialExpand()
+            } else if (sheetState.currentValue == SheetValue.PartiallyExpanded) {
+                sheetState.expand()
             }
         }
     }
