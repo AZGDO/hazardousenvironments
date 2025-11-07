@@ -70,15 +70,14 @@ fun HazardMap(
             maxZoomLevel = 19.0
         }
     }
-    val markerClusterer = remember { CustomRadiusMarkerClusterer(context, colorScheme) }
-    val markerController = remember { MarkerController(context, markerClusterer) }
     val viewportWatcher = remember { ViewportWatcher(onViewportChanged) }
     val locationOverlay = remember { MyLocationNewOverlay(GpsMyLocationProvider(context), mapView) }
+    val markerOverlay = remember { CustomMarkerOverlay(onMarkerSelected) }
 
     DisposableEffect(mapView) {
         mapView.onResume()
-        mapView.overlays.add(markerClusterer)
         mapView.overlays.add(locationOverlay)
+        mapView.overlays.add(markerOverlay)
         locationOverlay.enableMyLocation()
         viewportWatcher.attach(mapView)
         onDispose {
@@ -86,14 +85,6 @@ fun HazardMap(
             locationOverlay.disableMyLocation()
             mapView.onPause()
             mapView.onDetach()
-        }
-    }
-
-    DisposableEffect(onMarkerSelected) {
-        val listener = MapClickListener(onMarkerSelected)
-        mapView.overlays.add(0, listener)
-        onDispose {
-            mapView.overlays.remove(listener)
         }
     }
 
@@ -106,7 +97,6 @@ fun HazardMap(
                     if (lat != null && lon != null) {
                         val geoPoint = OsmGeoPoint(lat, lon)
                         mapView.controller.animateTo(geoPoint, FOCUS_ZOOM, ANIMATION_DURATION)
-                        markerController.pulseActiveMarker(command.place.id)
                     }
                 }
                 is HazardGridViewModel.MapCommand.FocusOnLocation -> {
@@ -131,13 +121,7 @@ fun HazardMap(
     }
 
     LaunchedEffect(uiState.allPlaces, uiState.activePlaceId) {
-        markerController.updateMarkers(
-            mapView = mapView,
-            places = uiState.allPlaces,
-            activeId = uiState.activePlaceId,
-            onMarkerSelected = onMarkerSelected
-        )
-        // Ensure the map redraws when the selection changes to remove old selection outlines
+        markerOverlay.setPlaces(uiState.allPlaces, uiState.activePlaceId)
         mapView.invalidate()
     }
 
@@ -177,47 +161,6 @@ fun HazardMap(
             false
         }
     )
-}
-
-private class MarkerController(
-    context: android.content.Context,
-    private val clusterer: CustomRadiusMarkerClusterer,
-) {
-    private val markerFactory = HazardMarkerFactory(context)
-
-    fun updateMarkers(
-        mapView: MapView,
-        places: List<Place>,
-        activeId: Int?,
-        onMarkerSelected: (Place?) -> Unit,
-    ) {
-        clusterer.items.clear()
-        places.forEach { place ->
-            val marker = createMarker(mapView, place)
-            marker.icon = markerFactory.getDrawable(place.id == activeId)
-            marker.setOnMarkerClickListener { _, _ ->
-                onMarkerSelected(place)
-                true
-            }
-            clusterer.add(marker)
-        }
-        clusterer.invalidate()
-        mapView.invalidate()
-    }
-
-    fun pulseActiveMarker(activeId: Int?) {
-        // Intentionally left for future pulse animation hook
-    }
-
-    private fun createMarker(mapView: MapView, place: Place): Marker {
-        val marker = Marker(mapView)
-        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        marker.infoWindow = null
-        if (place.lat != null && place.lon != null) {
-            marker.position = OsmGeoPoint(place.lat, place.lon)
-        }
-        return marker
-    }
 }
 
 private class ViewportWatcher(
@@ -291,23 +234,6 @@ private fun normalizeBearing(bearing: Float): Float {
     var value = bearing % 360f
     if (value < 0f) value += 360f
     return value
-}
-
-private class MapClickListener(
-    private val onMapClick: (Place?) -> Unit,
-) : Overlay() {
-    override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
-        val projection = mapView.projection
-        val geoPoint = projection.fromPixels(e.x.toInt(), e.y.toInt())
-        val overlay = mapView.overlays.firstOrNull {
-            it is Marker && it.isInfoWindowShown
-        }
-        if (overlay == null) {
-            onMapClick(null)
-            return true
-        }
-        return false
-    }
 }
 
 private const val DEFAULT_LAT = 55.7558

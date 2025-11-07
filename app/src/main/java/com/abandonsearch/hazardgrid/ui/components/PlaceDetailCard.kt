@@ -106,6 +106,7 @@ fun PlaceDetailCard(
                         onClick = {
                             clipboard.setText(AnnotatedString(coords))
                         },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text("Copy")
                     }
@@ -120,13 +121,17 @@ fun PlaceDetailCard(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl))
                             context.startActivity(intent)
                         },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text("Open maps", fontWeight = FontWeight.SemiBold)
                     }
                 }
                 val url = place.url
                 if (url.isNotBlank()) {
-                    TextButton(onClick = { onOpenIntel(url) }) {
+                    TextButton(
+                        onClick = { onOpenIntel(url) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                    ) {
                         Text("Open intel")
                     }
                 }

@@ -50,15 +50,15 @@ fun <T> FilterDropdown(
             label = { Text(text = label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = SurfaceBorder,
-                focusedBorderColor = TextSecondary,
-                focusedLabelColor = TextSecondary,
-                unfocusedLabelColor = TextSecondary.copy(alpha = 0.7f),
-                focusedContainerColor = NightOverlay.copy(alpha = 0.9f),
-                unfocusedContainerColor = NightOverlay.copy(alpha = 0.9f),
-                disabledContainerColor = NightOverlay.copy(alpha = 0.9f)
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                disabledContainerColor = MaterialTheme.colorScheme.surface
             ),
-            textStyle = androidx.compose.ui.text.TextStyle(color = TextSecondary),
+            textStyle = androidx.compose.ui.text.TextStyle(color = MaterialTheme.colorScheme.onSurface),
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth()

@@ -37,8 +37,8 @@ fun PlaceMetrics(place: Place) {
 private fun MetricChip(label: String, value: String) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = NightOverlay.copy(alpha = 0.85f),
-        border = BorderStroke(1.dp, SurfaceBorder)
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -47,12 +47,12 @@ private fun MetricChip(label: String, value: String) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextMuted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
