@@ -7,10 +7,13 @@ import android.view.MotionEvent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,6 +22,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,9 +52,11 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,6 +83,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -91,6 +99,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import androidx.compose.material.icons.rounded.Close
+import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.toPath
+import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.abandonsearch.hazardgrid.data.Place
@@ -126,150 +137,172 @@ fun HazardGridApp() {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900
+    val screenHeight = configuration.screenHeightDp.dp
+    val density = LocalDensity.current
+
     val sheetState = rememberStandardBottomSheetState(
         initialValue = SheetValue.PartiallyExpanded,
-        skipHiddenState = false
+        skipHiddenState = true
     )
     val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
     val coroutineScope = rememberCoroutineScope()
     var webViewUrl by remember { mutableStateOf<String?>(null) }
     val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val peekHeight = 110.dp + navBarHeight
+
+    val peekHeight = (screenHeight * 0.10f) + navBarHeight
+
     var isMapDragging by remember { mutableStateOf(false) }
 
     LaunchedEffect(isMapDragging) {
         coroutineScope.launch {
             if (isMapDragging) {
                 sheetState.partialExpand()
-            } else {
-                sheetState.partialExpand()
             }
         }
     }
 
-    BottomSheetScaffold(
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = peekHeight,
-        sheetShape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-        sheetDragHandle = { HazardSheetHandle() },
-        sheetContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-        sheetContentColor = MaterialTheme.colorScheme.onSurface,
-        sheetTonalElevation = 14.dp,
-        sheetContent = {
-            BoxWithConstraints(modifier = Modifier.fillMaxHeight(0.80f)) {
-                val isSheetExpanded by remember {
-                    derivedStateOf {
-                        val current = sheetState.currentValue
-                        val target = sheetState.targetValue
-                        current == SheetValue.Expanded || target == SheetValue.Expanded
-                    }
-                }
-                HazardPeninsulaSheet(
-                    uiState = uiState,
-                    isCompact = isCompact,
-                    isExpanded = isSheetExpanded,
-                    onSearchChange = viewModel::updateQuery,
-                    onFloorsChange = viewModel::updateFloors,
-                    onSecurityChange = viewModel::updateSecurity,
-                    onInteriorChange = viewModel::updateInterior,
-                    onAgeChange = viewModel::updateAge,
-                    onRatingChange = viewModel::updateRating,
-                    onSortChange = viewModel::updateSort,
-                    onClearFilters = viewModel::clearFilters,
-                    onResultSelected = { placeId ->
-                        viewModel.setActivePlace(placeId, centerOnMap = true)
-                        coroutineScope.launch { sheetState.partialExpand() }
-                    },
-                    onToggleExpand = {
-                        coroutineScope.launch {
-                            if (isSheetExpanded) {
-                                sheetState.partialExpand()
-                            } else {
-                                sheetState.expand()
-                            }
-                        }
-                    },
-                    onOpenIntel = { webViewUrl = it },
-                    onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
+    val sheetBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)
+
+    val context = LocalContext.current
+    val locationPermissions = remember {
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+    }
+    var hasLocationPermission by remember {
+        mutableStateOf(checkLocationPermission(context))
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        hasLocationPermission = result.entries.any { it.value }
+    }
+
+    val locationHeadingState = rememberLocationHeadingState(
+        requestUpdates = hasLocationPermission,
+        hasLocationPermission = hasLocationPermission,
+    )
+
+    val onGpsButtonClick: () -> Unit = {
+        if (hasLocationPermission) {
+            locationHeadingState.location?.let {
+                viewModel.sendMapCommand(
+                    HazardGridViewModel.MapCommand.FocusOnLocation(
+                        location = it,
+                        zoom = LOCATION_FOCUS_ZOOM,
+                        animate = false
+                    )
                 )
             }
+        } else {
+            permissionLauncher.launch(locationPermissions)
         }
-    ) { innerPadding ->
-        val context = LocalContext.current
-        val locationPermissions = remember {
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            )
-        }
-        var hasLocationPermission by remember {
-            mutableStateOf(checkLocationPermission(context))
-        }
-        val permissionLauncher = rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions()
-        ) { result ->
-            hasLocationPermission = result.entries.any { it.value }
-        }
+    }
 
-        val locationHeadingState = rememberLocationHeadingState(
-            requestUpdates = hasLocationPermission,
-            hasLocationPermission = hasLocationPermission,
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        BottomSheetScaffold(
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = peekHeight,
+            sheetShape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
+            sheetDragHandle = { HazardSheetHandle() },
+            sheetContainerColor = sheetBackgroundColor,
+            sheetContentColor = MaterialTheme.colorScheme.onSurface,
+            sheetTonalElevation = 14.dp,
+            sheetSwipeEnabled = true,
+            sheetContent = {
+                BoxWithConstraints(modifier = Modifier.fillMaxHeight(0.80f)) {
+                    val isSheetExpanded by remember {
+                        derivedStateOf {
+                            val current = sheetState.currentValue
+                            val target = sheetState.targetValue
+                            current == SheetValue.Expanded || target == SheetValue.Expanded
+                        }
+                    }
 
-        val onGpsButtonClick: () -> Unit = {
-            if (hasLocationPermission) {
-                locationHeadingState.location?.let {
-                    viewModel.sendMapCommand(
-                        HazardGridViewModel.MapCommand.FocusOnLocation(
-                            location = it,
-                            zoom = LOCATION_FOCUS_ZOOM,
-                            animate = false
-                        )
+                    HazardPeninsulaSheet(
+                        uiState = uiState,
+                        isCompact = isCompact,
+                        isExpanded = isSheetExpanded,
+                        onSearchChange = viewModel::updateQuery,
+                        onFloorsChange = viewModel::updateFloors,
+                        onSecurityChange = viewModel::updateSecurity,
+                        onInteriorChange = viewModel::updateInterior,
+                        onAgeChange = viewModel::updateAge,
+                        onRatingChange = viewModel::updateRating,
+                        onSortChange = viewModel::updateSort,
+                        onClearFilters = viewModel::clearFilters,
+                        onResultSelected = { placeId ->
+                            viewModel.setActivePlace(placeId, centerOnMap = true)
+                            coroutineScope.launch { sheetState.partialExpand() }
+                        },
+                        onToggleExpand = {
+                            coroutineScope.launch {
+                                if (isSheetExpanded) {
+                                    sheetState.partialExpand()
+                                } else {
+                                    sheetState.expand()
+                                }
+                            }
+                        },
+                        onOpenIntel = { webViewUrl = it },
+                        onClose = { viewModel.setActivePlace(null, centerOnMap = false) }
                     )
                 }
-            } else {
-                permissionLauncher.launch(locationPermissions)
             }
-        }
-
-        Box(modifier = Modifier.fillMaxSize()) {
-            HazardBackground()
-            HazardMap(
-                modifier = Modifier.fillMaxSize(),
-                uiState = uiState,
-                colorScheme = MaterialTheme.colorScheme,
-                onMarkerSelected = { place ->
-                    viewModel.setActivePlace(place?.id, centerOnMap = place != null)
-                },
-                onViewportChanged = viewModel::updateViewport,
-                onDragStart = { isMapDragging = true },
-                onDragEnd = { isMapDragging = false },
-                mapEvents = viewModel.mapEvents
-            )
-
-            LocationButton(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(innerPadding)
-                    .padding(bottom = 24.dp, end = 16.dp),
-                hasLocationPermission = hasLocationPermission,
-                isLocationAvailable = locationHeadingState.location != null,
-                onClick = onGpsButtonClick
-            )
-
-
-            if (uiState.isLoading) {
-                LoadingOverlay(modifier = Modifier.fillMaxSize())
-            }
-
-            uiState.errorMessage?.let { message ->
-                ErrorOverlay(
-                    message = message,
-                    onRetry = viewModel::loadPlaces,
-                    modifier = Modifier.fillMaxSize()
+        ) { innerPadding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                HazardBackground()
+                HazardMap(
+                    modifier = Modifier.fillMaxSize(),
+                    uiState = uiState,
+                    colorScheme = MaterialTheme.colorScheme,
+                    onMarkerSelected = { place ->
+                        viewModel.setActivePlace(place?.id, centerOnMap = place != null)
+                    },
+                    onViewportChanged = viewModel::updateViewport,
+                    onDragStart = { isMapDragging = true },
+                    onDragEnd = { isMapDragging = false },
+                    mapEvents = viewModel.mapEvents
                 )
+
+                if (uiState.isLoading) {
+                    LoadingOverlay(modifier = Modifier.fillMaxSize())
+                }
+
+                uiState.errorMessage?.let { message ->
+                    ErrorOverlay(
+                        message = message,
+                        onRetry = viewModel::loadPlaces,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
+
+        // Location button positioned OUTSIDE and ABOVE the BottomSheetScaffold
+        // Dynamically tracks sheet offset
+        val buttonBottomPadding = with(density) {
+            try {
+                val offsetPx = sheetState.requireOffset()
+                val screenHeightPx = screenHeight.toPx()
+                // Distance from bottom of screen to top of sheet + MUCH MORE spacing
+                (screenHeightPx - offsetPx).toDp() + 100.dp  // Changed from 16.dp to 100.dp
+            } catch (e: Exception) {
+                // Fallback to peek height if offset not available
+                peekHeight + 100.dp  // Changed from 16.dp to 100.dp
+            }
+        }
+
+        LocationButton(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = buttonBottomPadding),
+            hasLocationPermission = hasLocationPermission,
+            isLocationAvailable = locationHeadingState.location != null,
+            onClick = onGpsButtonClick,
+            backgroundColor = sheetBackgroundColor
+        )
 
         webViewUrl?.let { url ->
             Box(modifier = Modifier.fillMaxSize()) {
@@ -349,8 +382,6 @@ private fun HazardPeninsulaSheet(
     onOpenIntel: (String) -> Unit,
     onClose: () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -473,28 +504,123 @@ private fun HazardSheetHandle() {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LocationButton(
     modifier: Modifier = Modifier,
     hasLocationPermission: Boolean,
     isLocationAvailable: Boolean,
     onClick: () -> Unit,
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerLow  // Changed from onPrimary
 ) {
     val contentDescription = if (hasLocationPermission) "Center map on my position" else "Enable location access"
     val iconAlpha = if (!isLocationAvailable && hasLocationPermission) 0.6f else 1f
 
-    FilledIconButton(
-        modifier = modifier,
-        onClick = onClick
+    val shapes = remember {
+        listOf(
+            MaterialShapes.Circle,
+            MaterialShapes.Diamond,
+            MaterialShapes.Sunny,
+            MaterialShapes.Square,
+            MaterialShapes.Pill,
+            MaterialShapes.Cookie4Sided,
+            MaterialShapes.Slanted,
+            MaterialShapes.Triangle,
+            MaterialShapes.Pentagon,
+            MaterialShapes.Cookie6Sided,
+            MaterialShapes.Gem,
+            MaterialShapes.Cookie7Sided,
+            MaterialShapes.Flower
+        )
+    }
+
+    var currentShape by remember { mutableStateOf(shapes.random()) }
+    var targetShape by remember { mutableStateOf(shapes.random()) }
+
+    val animationProgress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    val iconColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = modifier
+            .size(88.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                if (animationProgress.value >= 1f || animationProgress.value == 0f) {
+                    val nextShape = shapes.filter { it != targetShape }.random()
+                    currentShape = targetShape
+                    targetShape = nextShape
+
+                    scope.launch {
+                        animationProgress.snapTo(0f)
+                        animationProgress.animateTo(
+                            targetValue = 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            )
+                        )
+                    }
+                }
+
+                onClick()
+            },
+        contentAlignment = Alignment.Center
     ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val shapeRadius = 36.dp.toPx()
+            val centerX = size.width / 2f
+            val centerY = size.height / 2f
+
+            val androidPath = android.graphics.Path()
+
+            if (animationProgress.value > 0f && animationProgress.value < 1f) {
+                val morph = Morph(currentShape, targetShape)
+                morph.toPath(animationProgress.value, androidPath)
+            } else {
+                targetShape.toPath(androidPath)
+            }
+
+            val bounds = android.graphics.RectF()
+            androidPath.computeBounds(bounds, true)
+
+            val matrix = android.graphics.Matrix()
+            matrix.setRectToRect(
+                android.graphics.RectF(bounds.left, bounds.top, bounds.right, bounds.bottom),
+                android.graphics.RectF(-shapeRadius, -shapeRadius, shapeRadius, shapeRadius),
+                android.graphics.Matrix.ScaleToFit.CENTER
+            )
+            androidPath.transform(matrix)
+
+            val shapeOffsetY = when {
+                targetShape == MaterialShapes.Triangle -> -4.dp.toPx()
+                targetShape == MaterialShapes.Pentagon -> -2.dp.toPx()
+                else -> 0f
+            }
+
+            androidPath.offset(centerX, centerY + shapeOffsetY)
+
+            val composePath = androidPath.asComposePath()
+
+            drawPath(
+                path = composePath,
+                color = backgroundColor
+            )
+        }
+
         Icon(
             imageVector = Icons.Rounded.MyLocation,
             contentDescription = contentDescription,
-            modifier = Modifier.alpha(iconAlpha)
+            modifier = Modifier
+                .size(38.dp)
+                .alpha(iconAlpha),
+            tint = iconColor
         )
     }
 }
-
 
 @Composable
 private fun HazardPulseIndicator() {
