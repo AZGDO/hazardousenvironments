@@ -34,7 +34,6 @@ class CustomMarkerOverlay(
 ) : Overlay() {
 
     private val markers = mutableListOf<Marker>()
-    private val clusters = mutableListOf<MarkerCluster>()
     private val handler = Handler(Looper.getMainLooper())
     private var activeMarker: Marker? = null
     private val interpolator = OvershootInterpolator()
@@ -63,6 +62,7 @@ class CustomMarkerOverlay(
         MaterialShapes.Arch,
         MaterialShapes.Gem,
         MaterialShapes.Cookie7Sided,
+        MaterialShapes.VerySunny,
         MaterialShapes.Arrow,
         MaterialShapes.Ghostish,
         MaterialShapes.Flower,
@@ -97,205 +97,61 @@ class CustomMarkerOverlay(
     }
 
     override fun draw(canvas: Canvas, projection: Projection) {
-        updateClusters(projection)
         val viewBounds = mapView.boundingBox.increaseByScale(1.5f)
-
-        clusters.forEach { cluster ->
-            if (cluster.markers.size == 1) {
-                val marker = cluster.markers.first()
-                if (viewBounds.contains(marker.point)) {
-                    drawMarker(canvas, projection, marker)
-                }
-            } else {
-                if (cluster.isAnimating) {
-                    var progress = (System.currentTimeMillis() - cluster.animationStartTime) / ANIMATION_DURATION.toFloat()
+        markers.forEach { marker ->
+            if (viewBounds.contains(marker.point)) {
+                val screenPoint = projection.toPixels(marker.point, null)
+                val polygon = if (marker.isAnimating) {
+                    var progress = (System.currentTimeMillis() - marker.animationStartTime) / ANIMATION_DURATION.toFloat()
                     if (progress >= 1f) {
-                        cluster.isAnimating = false
-                        // Replace cluster with a single marker at the center
-                        val newMarker = Marker(
-                            id = cluster.markers.sumBy { it.id }, // simplistic ID
-                            place = cluster.markers.first().place, // simplistic place
-                            point = cluster.centerPoint!!,
-                            startPolygon = cluster.endPolygon!!,
-                            endPolygon = shapes.random(),
-                            color = accentColors.random().toArgb()
-                        )
-                        markers.removeAll(cluster.markers)
-                        markers.add(newMarker)
-                        updateClusters(projection)
-                        return
+                        marker.isAnimating = false
+                        marker.startPolygon = marker.endPolygon
+                        progress = 1f
                     }
                     val interpolatedProgress = interpolator.getInterpolation(progress)
+                    val morph = Morph(marker.startPolygon, marker.endPolygon)
+                    morph.toPath(interpolatedProgress, path)
+                    null
+                } else {
+                    marker.startPolygon
+                }
 
-                    // Create a Path for the end polygon at the center
-                    val endPath = Path()
-                    cluster.endPolygon!!.toPath(endPath)
-                    val endBounds = RectF()
-                    endPath.computeBounds(endBounds, true)
-                    matrix.reset()
+                if (polygon != null) {
+                    val polygonBounds = polygon.calculateBounds()
                     matrix.setRectToRect(
-                        endBounds,
+                        RectF(polygonBounds[0], polygonBounds[1], polygonBounds[2], polygonBounds[3]),
                         RectF(-32f, -32f, 32f, 32f),
                         Matrix.ScaleToFit.CENTER
                     )
-                    endPath.transform(matrix)
-                    val centerScreenPoint = projection.toPixels(cluster.centerPoint, null)
-                    endPath.offset(centerScreenPoint.x.toFloat(), centerScreenPoint.y.toFloat())
-
-                    // Morph from the cluster path to the end path
-                    // This is a simplification; true morphing between arbitrary paths is complex.
-                    // Here we'll just fade out the cluster and fade in the new shape.
-                    val alpha = (255 * (1 - interpolatedProgress)).toInt()
-                    fillPaint.alpha = alpha
-                    strokePaint.alpha = alpha
-                    val clusterPath = Path()
-                    cluster.markers.forEach { marker ->
-                        val markerPath = getMarkerPath(projection, marker)
-                        clusterPath.op(markerPath, Path.Op.UNION)
-                    }
-                    canvas.drawPath(clusterPath, fillPaint)
-                    canvas.drawPath(clusterPath, strokePaint)
-
-                    fillPaint.alpha = (255 * interpolatedProgress).toInt()
-                    strokePaint.alpha = fillPaint.alpha
-                    canvas.drawPath(endPath, fillPaint)
-
-                    fillPaint.alpha = 255
-                    strokePaint.alpha = 255
-
-
-                } else {
-                    val clusterPath = Path()
-                    cluster.markers.forEach { marker ->
-                        val markerPath = getMarkerPath(projection, marker)
-                        clusterPath.op(markerPath, Path.Op.UNION)
-                    }
-
-                    // For now, just use the color of the first marker in the cluster
-                    fillPaint.color = cluster.markers.first().color
-                    canvas.drawPath(clusterPath, fillPaint)
-                    canvas.drawPath(clusterPath, strokePaint)
+                    polygon.toPath(path)
+                    path.transform(matrix)
                 }
+                path.offset(screenPoint.x.toFloat(), screenPoint.y.toFloat())
+
+                canvas.save()
+                canvas.rotate(marker.rotation, screenPoint.x.toFloat(), screenPoint.y.toFloat())
+                fillPaint.color = marker.color
+                canvas.drawPath(path, fillPaint)
+                canvas.drawPath(path, strokePaint)
+                canvas.restore()
             }
         }
-    }
-
-    private fun drawMarker(canvas: Canvas, projection: Projection, marker: Marker) {
-        val screenPoint = projection.toPixels(marker.point, null)
-        val markerPath = getMarkerPath(projection, marker)
-
-        canvas.save()
-        canvas.rotate(marker.rotation, screenPoint.x.toFloat(), screenPoint.y.toFloat())
-        fillPaint.color = marker.color
-        canvas.drawPath(markerPath, fillPaint)
-        canvas.drawPath(markerPath, strokePaint)
-        canvas.restore()
-    }
-
-    private fun getMarkerPath(projection: Projection, marker: Marker): Path {
-        val interpolatedPoint = if (marker.isAnimating && marker.targetPoint != null) {
-            val progress = interpolator.getInterpolation(((System.currentTimeMillis() - marker.animationStartTime) / ANIMATION_DURATION.toFloat()).coerceAtMost(1f))
-            GeoPoint(
-                marker.point.latitude + (marker.targetPoint!!.latitude - marker.point.latitude) * progress,
-                marker.point.longitude + (marker.targetPoint!!.longitude - marker.point.longitude) * progress
-            )
-        } else {
-            marker.point
-        }
-        val screenPoint = projection.toPixels(interpolatedPoint, null)
-        val markerPath = Path()
-
-        if (marker.isAnimating) {
-            var progress = (System.currentTimeMillis() - marker.animationStartTime) / ANIMATION_DURATION.toFloat()
-            if (progress >= 1f) {
-                marker.isAnimating = false
-                marker.startPolygon = marker.endPolygon
-                progress = 1f
-            }
-            val interpolatedProgress = interpolator.getInterpolation(progress)
-            val morph = Morph(marker.startPolygon, marker.endPolygon)
-            morph.toPath(interpolatedProgress, markerPath)
-        } else {
-            marker.startPolygon.toPath(markerPath)
-        }
-
-        val polygonBounds = if (marker.isAnimating) {
-            val tempBounds = RectF()
-            markerPath.computeBounds(tempBounds, true)
-            floatArrayOf(tempBounds.left, tempBounds.top, tempBounds.right, tempBounds.bottom)
-        } else {
-            marker.startPolygon.calculateBounds()
-        }
-
-        matrix.reset()
-        matrix.setRectToRect(
-            RectF(polygonBounds[0], polygonBounds[1], polygonBounds[2], polygonBounds[3]),
-            RectF(-32f, -32f, 32f, 32f),
-            Matrix.ScaleToFit.CENTER
-        )
-        markerPath.transform(matrix)
-        markerPath.offset(screenPoint.x.toFloat(), screenPoint.y.toFloat())
-        return markerPath
     }
 
     override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
-        val tappedCluster = getTappedCluster(e, mapView)
+        val tappedMarker = getTappedMarker(e, mapView)
 
-        if (tappedCluster != null) {
-            if (tappedCluster.markers.size == 1) {
-                val tappedMarker = tappedCluster.markers.first()
-                animateShapeChange(tappedMarker)
-                activeMarker = tappedMarker
-                onMarkerSelected(tappedMarker.place)
-            } else {
-                animateClusterMorph(tappedCluster)
-                onMarkerSelected(null) // Or decide what to do for cluster selection
-            }
+        if (tappedMarker != null) {
+            animateShapeChange(tappedMarker)
+            activeMarker = tappedMarker
+            onMarkerSelected(tappedMarker.place)
         } else {
             activeMarker?.let { animateShapeChange(it) }
             activeMarker = null
             onMarkerSelected(null)
         }
         mapView.postInvalidate()
-        return tappedCluster != null
-    }
-
-    private fun getTappedCluster(e: MotionEvent, mapView: MapView): MarkerCluster? {
-        for (cluster in clusters) {
-            for (marker in cluster.markers) {
-                val projection = mapView.projection
-                val screenPoint = projection.toPixels(marker.point, null)
-                val touchRect = android.graphics.Rect(e.x.toInt() - 40, e.y.toInt() - 40, e.x.toInt() + 40, e.y.toInt() + 40)
-                if (touchRect.contains(screenPoint.x, screenPoint.y)) {
-                    return cluster
-                }
-            }
-        }
-        return null
-    }
-
-    private fun animateClusterMorph(cluster: MarkerCluster) {
-        val centerPoint = GeoPoint(
-            cluster.markers.sumOf { it.point.latitude } / cluster.markers.size,
-            cluster.markers.sumOf { it.point.longitude } / cluster.markers.size
-        )
-        val endPolygon = shapes.random()
-
-        cluster.markers.forEach { marker ->
-            marker.isAnimating = true
-            marker.animationStartTime = System.currentTimeMillis()
-            marker.targetPoint = centerPoint
-            marker.endPolygon = endPolygon
-        }
-
-        handler.post(object : Runnable {
-            override fun run() {
-                if (cluster.markers.any { it.isAnimating }) {
-                    mapView.postInvalidate()
-                    handler.postDelayed(this, 16)
-                }
-            }
-        })
+        return tappedMarker != null
     }
 
     private fun animateShapeChange(marker: Marker) {
@@ -350,7 +206,6 @@ class CustomMarkerOverlay(
         var rotation: Float = (0..360).random().toFloat(),
         var isAnimating: Boolean = false,
         var animationStartTime: Long = 0L,
-        var targetPoint: GeoPoint? = null,
         val animationSpec: AnimationSpec<Float> = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -359,39 +214,5 @@ class CustomMarkerOverlay(
 
     companion object {
         private const val ANIMATION_DURATION = 500L
-        private const val CLUSTER_RADIUS_DP = 50
-    }
-
-    private data class MarkerCluster(
-        val markers: MutableList<Marker>,
-        var isAnimating: Boolean = false,
-        var animationStartTime: Long = 0L,
-        var centerPoint: GeoPoint? = null,
-        var endPolygon: RoundedPolygon? = null
-    )
-
-    private fun updateClusters(projection: Projection) {
-        clusters.clear()
-        val unclusteredMarkers = markers.toMutableList()
-        val clusterRadiusPx = CLUSTER_RADIUS_DP * mapView.context.resources.displayMetrics.density
-
-        while (unclusteredMarkers.isNotEmpty()) {
-            val currentMarker = unclusteredMarkers.first()
-            unclusteredMarkers.remove(currentMarker)
-
-            val newCluster = MarkerCluster(mutableListOf(currentMarker))
-            clusters.add(newCluster)
-
-            val nearbyMarkers = unclusteredMarkers.filter {
-                val p1 = projection.toPixels(currentMarker.point, null)
-                val p2 = projection.toPixels(it.point, null)
-                val dx = p1.x - p2.x
-                val dy = p1.y - p2.y
-                dx * dx + dy * dy < clusterRadiusPx * clusterRadiusPx
-            }
-
-            newCluster.markers.addAll(nearbyMarkers)
-            unclusteredMarkers.removeAll(nearbyMarkers)
-        }
     }
 }
