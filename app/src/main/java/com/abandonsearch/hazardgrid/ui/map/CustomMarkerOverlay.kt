@@ -111,7 +111,19 @@ class CustomMarkerOverlay(
                     var progress = (System.currentTimeMillis() - cluster.animationStartTime) / ANIMATION_DURATION.toFloat()
                     if (progress >= 1f) {
                         cluster.isAnimating = false
-                        progress = 1f
+                        // Replace cluster with a single marker at the center
+                        val newMarker = Marker(
+                            id = cluster.markers.sumBy { it.id }, // simplistic ID
+                            place = cluster.markers.first().place, // simplistic place
+                            point = cluster.centerPoint!!,
+                            startPolygon = cluster.endPolygon!!,
+                            endPolygon = shapes.random(),
+                            color = accentColors.random().toArgb()
+                        )
+                        markers.removeAll(cluster.markers)
+                        markers.add(newMarker)
+                        updateClusters(projection)
+                        return
                     }
                     val interpolatedProgress = interpolator.getInterpolation(progress)
 
@@ -347,7 +359,7 @@ class CustomMarkerOverlay(
 
     companion object {
         private const val ANIMATION_DURATION = 500L
-        private const val CLUSTER_RADIUS_DP = 150
+        private const val CLUSTER_RADIUS_DP = 50
     }
 
     private data class MarkerCluster(
