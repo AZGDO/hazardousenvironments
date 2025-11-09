@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -22,6 +23,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +44,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -50,10 +53,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialShapes
@@ -77,14 +80,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asComposePath
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -95,16 +95,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import androidx.compose.material.icons.rounded.Close
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.toPath
-import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.abandonsearch.hazardgrid.data.Place
+import com.abandonsearch.hazardgrid.data.settings.MapApp
+import com.abandonsearch.hazardgrid.data.settings.SettingsRepository
 import com.abandonsearch.hazardgrid.data.PlacesRepository
 import com.abandonsearch.hazardgrid.domain.GeoPoint
 import com.abandonsearch.hazardgrid.ui.components.ErrorOverlay
@@ -114,6 +117,9 @@ import com.abandonsearch.hazardgrid.ui.components.PlaceDetailCard
 import com.abandonsearch.hazardgrid.ui.components.WebView
 import com.abandonsearch.hazardgrid.ui.map.HazardMap
 import com.abandonsearch.hazardgrid.ui.map.rememberLocationHeadingState
+import com.abandonsearch.hazardgrid.ui.navigation.TRANSITION_DURATION
+import com.abandonsearch.hazardgrid.ui.navigation.enterTransition
+import com.abandonsearch.hazardgrid.ui.navigation.exitTransition
 import com.abandonsearch.hazardgrid.ui.state.HazardUiState
 import com.abandonsearch.hazardgrid.ui.theme.AccentPrimary
 import com.abandonsearch.hazardgrid.ui.theme.NightBackground
@@ -121,6 +127,9 @@ import com.abandonsearch.hazardgrid.ui.theme.NightOverlay
 import com.abandonsearch.hazardgrid.ui.theme.SurfaceBorder
 import com.abandonsearch.hazardgrid.ui.theme.TextPrimary
 import com.abandonsearch.hazardgrid.ui.theme.TextSecondary
+import com.abandonsearch.hazardgrid.ui.settings.SettingsScreen
+import com.abandonsearch.hazardgrid.ui.settings.SettingsViewModel
+import com.abandonsearch.hazardgrid.ui.settings.SettingsViewModelFactory
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
@@ -134,7 +143,9 @@ import kotlin.math.sqrt
 @Composable
 fun HazardGridApp() {
     val viewModel = hazardGridViewModel()
+    val settingsViewModel = hazardSettingsViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val appSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900
     val screenHeight = configuration.screenHeightDp.dp
@@ -147,6 +158,7 @@ fun HazardGridApp() {
     val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
     val coroutineScope = rememberCoroutineScope()
     var webViewUrl by remember { mutableStateOf<String?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
     val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     val peekHeight = (screenHeight * 0.10f) + navBarHeight
@@ -224,6 +236,7 @@ fun HazardGridApp() {
                         uiState = uiState,
                         isCompact = isCompact,
                         isExpanded = isSheetExpanded,
+                        mapApp = appSettings.defaultMapApp,
                         onSearchChange = viewModel::updateQuery,
                         onFloorsChange = viewModel::updateFloors,
                         onSecurityChange = viewModel::updateSecurity,
@@ -263,7 +276,8 @@ fun HazardGridApp() {
                     onViewportChanged = viewModel::updateViewport,
                     onDragStart = { isMapDragging = true },
                     onDragEnd = { isMapDragging = false },
-                    mapEvents = viewModel.mapEvents
+                    mapEvents = viewModel.mapEvents,
+                    mergeShapesEnabled = appSettings.mergeShapesEnabled
                 )
 
                 if (uiState.isLoading) {
@@ -304,6 +318,19 @@ fun HazardGridApp() {
             backgroundColor = sheetBackgroundColor
         )
 
+        AnimatedActionButton(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(start = 16.dp, top = 12.dp),
+            icon = Icons.Rounded.Settings,
+            contentDescription = "Open settings",
+            iconTint = MaterialTheme.colorScheme.primary,
+            backgroundColor = sheetBackgroundColor.copy(alpha = 0.9f),
+            size = 64.dp,
+            onClick = { showSettings = true }
+        )
+
         webViewUrl?.let { url ->
             Box(modifier = Modifier.fillMaxSize()) {
                 WebView(url)
@@ -315,6 +342,35 @@ fun HazardGridApp() {
                         imageVector = Icons.Rounded.Close,
                         contentDescription = "Close web view",
                         tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = fadeIn(animationSpec = tween(durationMillis = TRANSITION_DURATION)),
+            exit = fadeOut(animationSpec = tween(durationMillis = TRANSITION_DURATION)),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedVisibility(
+                    visible = showSettings,
+                    enter = enterTransition(),
+                    exit = exitTransition()
+                ) {
+                    SettingsScreen(
+                        settings = appSettings,
+                        onDismiss = { showSettings = false },
+                        onMapAppSelected = settingsViewModel::setDefaultMapApp,
+                        onMergeShapesChanged = settingsViewModel::setMergeShapesEnabled
                     )
                 }
             }
@@ -365,10 +421,18 @@ private fun hazardGridViewModel(): HazardGridViewModel {
 }
 
 @Composable
+private fun hazardSettingsViewModel(): SettingsViewModel {
+    val context = LocalContext.current.applicationContext
+    val repository = remember { SettingsRepository(context) }
+    return viewModel(factory = SettingsViewModelFactory(repository))
+}
+
+@Composable
 private fun HazardPeninsulaSheet(
     uiState: HazardUiState,
     isCompact: Boolean,
     isExpanded: Boolean,
+    mapApp: MapApp,
     onSearchChange: (String) -> Unit,
     onFloorsChange: (com.abandonsearch.hazardgrid.domain.FloorsFilter) -> Unit,
     onSecurityChange: (com.abandonsearch.hazardgrid.domain.ScaleFilter) -> Unit,
@@ -398,6 +462,7 @@ private fun HazardPeninsulaSheet(
             )
             PlaceDetailCard(
                 place = uiState.activePlace,
+                mapApp = mapApp,
                 onClose = onClose,
                 onOpenIntel = onOpenIntel
             )
@@ -413,6 +478,7 @@ private fun HazardPeninsulaSheet(
                 onRatingChange = onRatingChange,
                 onSortChange = onSortChange,
                 onResultSelected = onResultSelected,
+                mapApp = mapApp,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -511,7 +577,7 @@ private fun LocationButton(
     hasLocationPermission: Boolean,
     isLocationAvailable: Boolean,
     onClick: () -> Unit,
-    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerLow  // Changed from onPrimary
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerLow
 ) {
     val contentDescription = if (hasLocationPermission) "Center map on my position" else "Enable location access"
     val iconAlpha = if (!isLocationAvailable && hasLocationPermission) 0.6f else 1f
@@ -535,37 +601,36 @@ private fun LocationButton(
     }
 
     var currentShape by remember { mutableStateOf(shapes.random()) }
-    var targetShape by remember { mutableStateOf(shapes.random()) }
-
-    val animationProgress = remember { Animatable(0f) }
+    var targetShape by remember { mutableStateOf(shapes.filter { it != currentShape }.random()) }
+    val animationProgress = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
-
-    val iconColor = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = modifier
             .size(88.dp)
+            .clip(CircleShape)
+            .shadow(16.dp, CircleShape, clip = false)
+            .background(backgroundColor.copy(alpha = 0.95f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                shape = CircleShape
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                if (animationProgress.value >= 1f || animationProgress.value == 0f) {
-                    val nextShape = shapes.filter { it != targetShape }.random()
-                    currentShape = targetShape
-                    targetShape = nextShape
+                val nextShape = shapes.filter { it != targetShape }.random()
+                currentShape = targetShape
+                targetShape = nextShape
 
-                    scope.launch {
-                        animationProgress.snapTo(0f)
-                        animationProgress.animateTo(
-                            targetValue = 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        )
-                    }
+                scope.launch {
+                    animationProgress.snapTo(0f)
+                    animationProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                    )
                 }
-
                 onClick()
             },
         contentAlignment = Alignment.Center
@@ -576,8 +641,7 @@ private fun LocationButton(
             val centerY = size.height / 2f
 
             val androidPath = android.graphics.Path()
-
-            if (animationProgress.value > 0f && animationProgress.value < 1f) {
+            if (animationProgress.value in 0f..1f) {
                 val morph = Morph(currentShape, targetShape)
                 morph.toPath(animationProgress.value, androidPath)
             } else {
@@ -586,38 +650,101 @@ private fun LocationButton(
 
             val bounds = android.graphics.RectF()
             androidPath.computeBounds(bounds, true)
-
             val matrix = android.graphics.Matrix()
             matrix.setRectToRect(
-                android.graphics.RectF(bounds.left, bounds.top, bounds.right, bounds.bottom),
+                bounds,
                 android.graphics.RectF(-shapeRadius, -shapeRadius, shapeRadius, shapeRadius),
                 android.graphics.Matrix.ScaleToFit.CENTER
             )
             androidPath.transform(matrix)
 
-            val shapeOffsetY = when {
-                targetShape == MaterialShapes.Triangle -> -4.dp.toPx()
-                targetShape == MaterialShapes.Pentagon -> -2.dp.toPx()
+            val shapeOffsetY = when (targetShape) {
+                MaterialShapes.Triangle -> -4.dp.toPx()
+                MaterialShapes.Pentagon -> -2.dp.toPx()
                 else -> 0f
             }
 
             androidPath.offset(centerX, centerY + shapeOffsetY)
-
             val composePath = androidPath.asComposePath()
-
-            drawPath(
-                path = composePath,
-                color = backgroundColor
-            )
+            drawPath(path = composePath, color = backgroundColor)
         }
 
         Icon(
             imageVector = Icons.Rounded.MyLocation,
             contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier
-                .size(38.dp)
-                .alpha(iconAlpha),
-            tint = iconColor
+                .size(36.dp)
+                .alpha(iconAlpha)
+        )
+    }
+}
+
+@Composable
+private fun AnimatedActionButton(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    contentDescription: String,
+    iconTint: Color,
+    backgroundColor: Color,
+    iconAlpha: Float = 1f,
+    size: Dp = 88.dp,
+    onClick: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val clickScale = remember { Animatable(1f) }
+    val pulseTransition = rememberInfiniteTransition(label = "action-button-pulse")
+    val pulseScale by pulseTransition.animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse-scale"
+    )
+    val combinedScale = pulseScale * clickScale.value
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                scaleX = combinedScale
+                scaleY = combinedScale
+            }
+            .clip(CircleShape)
+            .shadow(16.dp, CircleShape, clip = false)
+            .background(backgroundColor.copy(alpha = 0.95f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                shape = CircleShape
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                scope.launch {
+                    clickScale.snapTo(0.9f)
+                    clickScale.animateTo(
+                        targetValue = 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
+                }
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = iconTint,
+            modifier = Modifier
+                .size(36.dp)
+                .alpha(iconAlpha)
         )
     }
 }

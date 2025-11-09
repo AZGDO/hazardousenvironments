@@ -35,6 +35,7 @@ class CustomMarkerOverlay(
     private val markers = mutableListOf<Marker>()
     private val handler = Handler(Looper.getMainLooper())
     private var activeMarker: Marker? = null
+    private var mergingEnabled = true
     private val interpolator = OvershootInterpolator()
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -108,13 +109,41 @@ class CustomMarkerOverlay(
             )
         }
         lastZoomLevel = mapView.zoomLevelDouble
-        updateClusters(mapView.projection, mapView.boundingBox.increaseByScale(1.5f))
+        if (mergingEnabled) {
+            updateClusters(mapView.projection, mapView.boundingBox.increaseByScale(1.5f))
+        }
         mapView.invalidate()
+    }
+
+    fun setMergingEnabled(enabled: Boolean) {
+        if (mergingEnabled == enabled) return
+        mergingEnabled = enabled
+        if (!enabled) {
+            clusters.clear()
+            markers.forEach { marker ->
+                marker.isInCluster = false
+                marker.currentClusterId = null
+                marker.isUnmerging = false
+            }
+            mapView.postInvalidate()
+            return
+        }
+        updateClusters(mapView.projection, mapView.boundingBox.increaseByScale(1.5f))
+        mapView.postInvalidate()
     }
 
     override fun draw(canvas: Canvas, projection: Projection) {
         val viewBounds = mapView.boundingBox.increaseByScale(1.5f)
         val currentZoom = mapView.zoomLevelDouble
+
+        if (!mergingEnabled) {
+            for (marker in markers) {
+                if (viewBounds.contains(marker.point)) {
+                    drawMarker(canvas, projection, marker)
+                }
+            }
+            return
+        }
 
         // Only recalculate clusters if zoom level changed significantly
         if (abs(currentZoom - lastZoomLevel) > 0.1 && !isRecalculating) {
@@ -144,6 +173,11 @@ class CustomMarkerOverlay(
 
     private fun updateClusters(projection: Projection, viewBounds: org.osmdroid.util.BoundingBox) {
         if (isRecalculating) return
+        if (!mergingEnabled) {
+            clusters.clear()
+            isRecalculating = false
+            return
+        }
         isRecalculating = true
 
         val previousClusters = clusters.toMap()
@@ -637,7 +671,7 @@ class CustomMarkerOverlay(
     }
 
     override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
-        val tappedCluster = getTappedCluster(e, mapView)
+        val tappedCluster = if (mergingEnabled) getTappedCluster(e, mapView) else null
         val tappedMarker = if (tappedCluster == null) getTappedMarker(e, mapView) else null
 
         if (tappedCluster != null) {
@@ -702,6 +736,7 @@ class CustomMarkerOverlay(
     }
 
     private fun getTappedCluster(e: MotionEvent, mapView: MapView): MarkerCluster? {
+        if (!mergingEnabled) return null
         val projection = mapView.projection
         val touchX = e.x
         val touchY = e.y
